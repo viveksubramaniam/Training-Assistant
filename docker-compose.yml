@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Frontend - React/Vite app served by nginx
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - run-coach-network
+    restart: unless-stopped
+
+  # Node.js API - Authentication, Strava integration, activity storage
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - AI_SERVICE_URL=http://ai-service:5001
+      - CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+    env_file:
+      - ./server/.env
+    volumes:
+      # Persist database files
+      - ./server/db.json:/app/db.json
+      - ./server/ai_summaries.json:/app/ai_summaries.json
+    depends_on:
+      - ai-service
+    networks:
+      - run-coach-network
+    restart: unless-stopped
+
+  # Python AI Service - AI coaching summaries
+  ai-service:
+    build:
+      context: ./server/ai_service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - LLM_ENDPOINT=http://host.docker.internal:1234/v1/chat/completions
+      - CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:3000
+    networks:
+      - run-coach-network
+    restart: unless-stopped
+    # Note: LM Studio must be running on host machine
+
+networks:
+  run-coach-network:
+    driver: bridge

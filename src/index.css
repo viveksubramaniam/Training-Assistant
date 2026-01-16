@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* ============================================
+   ECLIPSE PERFORMANCE THEME
+   ============================================ */
+
+/* Dark theme base */
+html {
+    color-scheme: dark;
+}
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #0f172a;
+    color: #f1f5f9;
+}
+
+/* CSS Custom Properties */
+:root {
+    --color-primary: #f97415;
+    --color-background-dark: #0f172a;
+    --color-cosmic-indigo: #818CF8;
+    --color-slate-card: rgba(30, 41, 59, 0.7);
+}
+
+/* Glass morphism card */
+.glass-card {
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Glass metric bar (for map overlay) */
+.glass-metric {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* HR Zone gradient bar */
+.hr-gradient {
+    background: linear-gradient(90deg, #3b82f6 0%, #10b981 25%, #facc15 50%, #f97316 75%, #ef4444 100%);
+}
+
+/* Chart grid background */
+.chart-grid {
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+/* Glow path for SVG route overlays */
+.glow-path {
+    filter: drop-shadow(0 0 4px #f97415);
+}
+
+/* AI Pulse glowing border effect */
+.ai-pulse-border {
+    position: relative;
+}
+
+.ai-pulse-border::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 0.85rem;
+    background: linear-gradient(45deg, #818CF8, #4f46e5, #818CF8);
+    z-index: -1;
+    opacity: 0.6;
+    filter: blur(4px);
+    animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Slow spin animation for loading icons */
+@keyframes spin-slow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin-slow {
+    animation: spin-slow 8s linear infinite;
+}
+
+/* Status badge glow effects */
+.badge-glow-indigo {
+    box-shadow: 0 0 10px rgba(129, 140, 248, 0.3);
+}
+
+.badge-glow-emerald {
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.badge-glow-amber {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}

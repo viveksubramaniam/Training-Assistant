@@ -1,0 +1,157 @@
+{
+  "summaries": [
+    {
+      "activityId": "17034831251",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "17034831251",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Low\", \"summary\": \"The run demonstrates effective recovery with a balanced HR zone distribution and appropriate effort level, showing good pacing and low intensity.\", \"highlight\": \"Consistent pacing across zones indicates solid recovery work.\", \"suggestion\": \"Maintain this easy pace to sustain the recovery benefits while keeping heart rate in the target zone.\"}",
+          "generatedAt": "2026-01-15T10:33:50.531231",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T10:33:50.533Z"
+        },
+        {
+          "versionNumber": 2,
+          "activityId": "17034831251",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Low\", \"summary\": \"The run demonstrates effective recovery with a balanced HR zone distribution and appropriate effort level, showing good pacing and low intensity.\", \"highlight\": \"Consistent pacing across zones indicates solid recovery work.\", \"suggestion\": \"Maintain this easy pace to sustain the recovery benefits while keeping heart rate in the target zone.\"}",
+          "generatedAt": "2026-01-15T11:53:51.787955",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T11:53:51.791Z"
+        }
+      ],
+      "selectedVersion": 1,
+      "regenerationCount": 2
+    },
+    {
+      "activityId": "16885404915",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "16885404915",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Low\", \"summary\": \"The run demonstrates effective recovery with a consistent pace and low effort, indicating good active recovery. The pacing suggests the athlete is maintaining a comfortable zone without overexertion.\", \"highlight\": \"Good HR zone distribution throughout the session supports recovery goals.\", \"suggestion\": \"Consider adding a brief dynamic warm-up before future runs to enhance readiness.\"}",
+          "generatedAt": "2026-01-15T12:03:58.311093",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T12:03:58.466Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "17012716892",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "17012716892",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Low\", \"summary\": \"The session demonstrates effective recovery pacing with a strong emphasis on Zone 2 endurance, maintaining a comfortable tempo while staying within safe heart rate zones.\", \"highlight\": \"Consistent pacing across all zones supports recovery without sacrificing cardiovascular benefits.\", \"suggestion\": \"Consider adding a brief interval at the end to further elevate intensity and improve VO2 max.\"}",
+          "generatedAt": "2026-01-15T12:09:35.239057",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T12:09:35.269Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "17022013018",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "17022013018",
+          "text": "{\"runType\": \"Easy Run\", \"relativeEffort\": \"Moderate\", \"summary\": \"The run demonstrates solid endurance with a strong emphasis on Zone 2 pacing, indicating effective recovery and aerobic development. The low suffering score suggests manageable effort, while the consistent easy pace supports long-term fitness goals.\", \"highlight\": \"Good HR zone distribution across all zones supports sustainable training.\", \"suggestion\": \"Maintain current pacing in Zone 2 to further enhance cardiovascular efficiency.\"}",
+          "generatedAt": "2026-01-15T12:23:14.825929",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T12:23:14.827Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "16812220535",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "16812220535",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Low\", \"summary\": \"The run shows a well-balanced effort with consistent pacing and a good HR zone distribution, indicating effective recovery-focused training.\", \"way_forward\": \"Consider incorporating interval bursts to elevate intensity while maintaining recovery benefits.\", \"highlight\": \"Good HR zone distribution throughout the session\", \"suggestion\": \"Add short high-intensity intervals in the final stretch to boost performance without compromising recovery.\"}",
+          "generatedAt": "2026-01-15T12:29:11.360154",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T12:29:11.392Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "16431545165",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "16431545165",
+          "text": "{\"runType\": \"Easy Run\", \"relativeEffort\": \"Moderate\", \"summary\": \"The run demonstrates solid endurance with a balanced distribution across paces, though the high percentage in Zone 3 suggests some elevation or intensity shifts that could be refined.\", \"way_forward\": \"Focus on maintaining consistent pacing and gradually increasing effort in the later stages to stay within target zones.\", \"highlight\": \"Good HR zone distribution with a strong presence in Zone 2, indicating effective aerobic development.\", \"suggestion\": \"Consider incorporating short intervals at the finish to elevate intensity slightly while staying within your training load context.\"}",
+          "generatedAt": "2026-01-15T12:37:50.428513",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T12:37:50.654Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "16834811495",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "16834811495",
+          "text": "{\"runType\": \"Recovery Run\", \"relativeEffort\": \"Moderate\", \"summary\": \"The session shows a balanced effort with strong time in Zone 2, indicating effective aerobic conditioning while staying within a manageable heart rate zone.\", \"way_forward\": \"Consider incorporating interval bursts to elevate the intensity and further challenge your VO2 max without exceeding recovery capacity.\", \"highlight\": \"Good HR zone distribution across moderate zones supports sustainable training.\", \"suggestion\": \"Add short high-intensity intervals to boost intensity while maintaining a comfortable pace.\"}",
+          "generatedAt": "2026-01-15T13:08:45.276168",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T13:08:45.354Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "14626856568",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "14626856568",
+          "text": "{\"runType\": \"Easy Run\", \"relativeEffort\": \"Moderate\", \"summary\": \"The run demonstrates a solid effort with a balanced distribution across paces, showing good endurance maintenance without pushing into high-intensity zones.\", \"way_forward\": \"Focus on maintaining consistent pacing and gradually increasing the distance to build mileage while keeping effort in Zone 2.\", \"highlight\": \"Good HR zone distribution indicates effective aerobic conditioning.\", \"suggestion\": \"Consider adding a short recovery interval before the next segment to enhance recovery and readiness.\"}",
+          "generatedAt": "2026-01-15T17:47:19.486108",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T17:47:19.517Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    },
+    {
+      "activityId": "17059464885",
+      "versions": [
+        {
+          "versionNumber": 1,
+          "activityId": "17059464885",
+          "text": "{\"runType\": \"Recovery Run\", \"intensity_label\": \"Recovery\", \"relativeEffort\": \"Low\", \"summary\": \"The run demonstrates effective recovery-focused pacing with a strong HR zone distribution in Zone 1, indicating good aerobic conditioning without excessive strain.\", \"way_forward\": \"Focus on maintaining consistent pacing and leveraging the low-intensity zones to enhance recovery while keeping the suffer score manageable.\", \"highlight\": \"Good HR zone distribution across easy pace indicates solid aerobic base.\", \"suggestion\": \"Consider adding short intervals in Zone 2 during future runs to gradually increase aerobic capacity.\"}",
+          "generatedAt": "2026-01-15T18:32:58.324549",
+          "model": "liquid/lfm2.5-1.2b",
+          "status": "success",
+          "cachedAt": "2026-01-15T18:32:58.326Z"
+        }
+      ],
+      "selectedVersion": null,
+      "regenerationCount": 1
+    }
+  ]
+}

@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Eclipse Performance AI Run Coach</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">< !DOCTYPE html >
+            <html class="dark" lang="en"><head>
+                <meta charset="utf-8" />
+                <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+                <title>Eclipse Performance AI Run Coach - Dashboard</title>
+                <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+                                             tailwind.config = {
+                                                 darkMode: "class",
+                                             theme: {
+                                                 extend: {
+                                                 colors: {
+                                                 "primary": "#f97415",
+                                             "ignite-orange": "#f97415",
+                                             "deep-slate": "#0F172A",
+                                             "background-dark": "#0F172A",
+                                             "cosmic-indigo": "#312e81",
+                                             "glass-slate": "rgba(30, 41, 59, 0.7)",
+                    },
+                                             fontFamily: {
+                                                 "display": ["Inter", "sans-serif"],
+                                             "mono": ["JetBrains Mono", "monospace"]
+                    },
+                                             borderRadius: {
+                                                 "DEFAULT": "0.25rem",
+                                             "lg": "0.5rem",
+                                             "xl": "0.75rem",
+                                             "2xl": "1rem",
+                                             "3xl": "1.5rem",
+                                             "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        .glass {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-orange {
+            box-shadow: 0 0 40px rgba(249, 116, 21, 0.25);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0F172A;
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .achievement-badge {
+            background: linear-gradient(135deg, #f97415 0%, #ea580c 100%);
+        }
+    </style>
+</head>
+
+<body class="text-slate-100 min-h-screen font-display">
+    <header class="sticky top-0 z-50 glass bg-black/20 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 bg-ignite-orange rounded-lg flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                    <span class="material-symbols-outlined font-bold">shadow</span>
+                </div>
+                <h1 class="text-xl font-extrabold tracking-tight text-white uppercase">ECLIPSE <span
+                        class="text-ignite-orange">PERFORMANCE</span></h1>
+            </div>
+            <nav class="hidden md:flex items-center gap-10">
+                <a class="text-sm font-semibold text-ignite-orange transition-colors" href="#">Home</a>
+                <a class="text-sm font-semibold hover:text-ignite-orange transition-colors opacity-70" href="#">Training
+                    History</a>
+                <a class="text-sm font-semibold hover:text-ignite-orange transition-colors opacity-70"
+                    href="#">Analytics</a>
+                <a class="text-sm font-semibold hover:text-ignite-orange transition-colors opacity-70"
+                    href="#">Community</a>
+            </nav>
+            <div class="flex items-center gap-6">
+                <div
+                    class="flex items-center gap-2 bg-ignite-orange/10 border border-ignite-orange/20 px-4 py-2 rounded-full">
+                    <span class="material-symbols-outlined text-ignite-orange text-xl">local_fire_department</span>
+                    <span class="text-sm font-bold text-ignite-orange">12 DAY STREAK</span>
+                </div>
+                <div class="flex items-center gap-3 border-l border-white/10 pl-6">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5">
+                        <span class="material-symbols-outlined">notifications</span>
+                    </button>
+                    <div class="w-10 h-10 rounded-full border-2 border-ignite-orange overflow-hidden">
+                        <img alt="User profile" class="w-full h-full object-cover"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSGjJQ7alGPjUpRGQ1GGly2R8Lu5TEofmMdmLhmJNVglWOrY5QAFt1CpDmrBMuJmjVVEWpz8sHD98VxFcl1IvOd3z2ROF9l7QUNy_B2CLb869lP5qq84sf65xZuQ00SWlFbRX0mHKB6fwKCRNKzFhGYGO9a5dt80Ywtdbrr0hDv3P3qFna7JYNPZQ6O-jpaMvPyGG76m3PiGUOdMqukvUp1M7TdhARShoJg0MpbVyyusafPvOWemy6lXbCFDSZNUTsDBATak9o-z0" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="max-w-7xl mx-auto px-6 py-10 space-y-12">
+        <section class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="space-y-2">
+                <h2 class="text-5xl font-black tracking-tight text-white">Good Morning, <span
+                        class="text-ignite-orange">Alex!</span></h2>
+                <p class="text-lg font-medium text-slate-400">Rest, recover, and reflect. You put in the work today.</p>
+            </div>
+            <div class="glass bg-white/5 p-4 rounded-2xl border-white/10 min-w-[320px]">
+                <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 ml-1 text-center">How's your
+                    recovery feeling?</p>
+                <div class="flex gap-2">
+                    <button
+                        class="flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all">
+                        <span class="material-symbols-outlined text-emerald-500">sentiment_very_satisfied</span>
+                        <span class="text-[10px] font-bold text-emerald-500 uppercase">Strong</span>
+                    </button>
+                    <button
+                        class="flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-ignite-orange/10 border border-ignite-orange/20 hover:bg-ignite-orange/20 transition-all">
+                        <span class="material-symbols-outlined text-ignite-orange">sentiment_satisfied</span>
+                        <span class="text-[10px] font-bold text-ignite-orange uppercase">Okay</span>
+                    </button>
+                    <button
+                        class="flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all">
+                        <span class="material-symbols-outlined text-rose-500">sentiment_dissatisfied</span>
+                        <span class="text-[10px] font-bold text-rose-500 uppercase">Sore</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+        <section class="relative">
+            <div class="relative overflow-hidden rounded-3xl glow-orange bg-deep-slate border border-white/10">
+                <div
+                    class="absolute inset-0 opacity-20 bg-[url('https://lh3.googleusercontent.com/aida-public/AB6AXuApvg49L3qSHo7b4cy73edJZn_QNShz8GVmtEyhDv08Z0cnlLap6RiRHxGdjX8jTg7no9KqnXA7r07_fBjQiKEzgMCp98LDWvA6amaCdydlEW8vQWHRTH9KPiv6wT8aX5ZYNWfbM34hT216O9S6pw08XZ2yPMhUTMy-z271rB7TJqcln4SrtPx33anNHBCIUTTMDn3tscXc32xK_37cA-PiJzdmyz8Y_5fgGHTF7dt2HQ8d2jzV0Yq0Bn7l-Rgbhr1df9pIKf4mM7E')] bg-cover bg-center">
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-r from-deep-slate via-deep-slate/90 to-transparent"></div>
+                <div class="relative p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-10">
+                    <div class="space-y-6 max-w-xl">
+                        <div
+                            class="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full border border-emerald-500/30">
+                            <span class="material-symbols-outlined text-sm font-bold">check_circle</span>
+                            <span class="text-xs font-black uppercase tracking-widest">Session Completed</span>
+                        </div>
+                        <div class="space-y-2">
+                            <h3 class="text-5xl font-black text-white leading-tight">Workout Complete!</h3>
+                            <p class="text-xl text-slate-300 font-medium">Phenomenal effort, Alex. You stayed perfectly
+                                within your target zones and showed great discipline.</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 py-6 border-y border-white/10 font-mono">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Distance
+                                </p>
+                                <p class="text-3xl font-extrabold text-white">8.62<span
+                                        class="text-sm font-normal text-slate-400 ml-1">km</span></p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Time</p>
+                                <p class="text-3xl font-extrabold text-white">46:12</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Avg Pace
+                                </p>
+                                <p class="text-3xl font-extrabold text-white">5:21<span
+                                        class="text-sm font-normal text-slate-400 ml-1">/km</span></p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-ignite-orange uppercase tracking-widest mb-1">Perf.
+                                    Pts</p>
+                                <p class="text-3xl font-extrabold text-ignite-orange">+124</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <button
+                                class="bg-white text-deep-slate hover:bg-slate-200 font-black py-4 px-8 rounded-2xl transition-all shadow-xl active:scale-95 text-base uppercase tracking-tight">
+                                View Deep Analysis
+                            </button>
+                            <button
+                                class="flex items-center gap-2 p-4 rounded-2xl border border-white/20 text-white hover:bg-white/10 transition-colors">
+                                <span class="material-symbols-outlined">share</span>
+                                <span class="font-bold text-sm">Share</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative flex-shrink-0">
+                        <div
+                            class="w-64 h-64 rounded-full border-8 border-white/5 flex items-center justify-center relative">
+                            <svg class="absolute inset-0 w-full h-full -rotate-90">
+                                <circle class="text-white/5" cx="128" cy="128" fill="transparent" r="120"
+                                    stroke="currentColor" stroke-width="8"></circle>
+                                <circle class="text-ignite-orange" cx="128" cy="128" fill="transparent" r="120"
+                                    stroke="currentColor" stroke-dasharray="753.98" stroke-dashoffset="150.8"
+                                    stroke-linecap="round" stroke-width="12"></circle>
+                            </svg>
+                            <div class="text-center">
+                                <span class="block text-5xl font-black text-white font-mono">80%</span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Daily
+                                    Goal</span>
+                            </div>
+                        </div>
+                        <div
+                            class="absolute -bottom-4 left-1/2 -translate-x-1/2 achievement-badge px-6 py-2 rounded-full shadow-lg border border-white/20">
+                            <span class="text-white font-black text-xs uppercase tracking-tighter italic">Personal
+                                Best!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <section class="lg:col-span-8 space-y-6">
+                <div class="flex items-center gap-3 px-2">
+                    <span class="material-symbols-outlined text-ignite-orange">psychology</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Coach Insight</h2>
+                </div>
+                <div class="glass bg-slate-900/50 rounded-3xl p-6 md:p-8 space-y-6 border-white/5">
+                    <div class="flex justify-end">
+                        <div
+                            class="bg-slate-700/50 text-slate-200 px-6 py-4 rounded-2xl rounded-tr-none max-w-[80%] border border-white/5">
+                            <p class="text-base italic">"That felt surprisingly smooth despite the calf soreness I felt
+                                this morning."</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div
+                            class="w-10 h-10 rounded-full bg-cosmic-indigo flex-shrink-0 flex items-center justify-center text-white shadow-lg">
+                            <span class="material-symbols-outlined text-xl">auto_awesome</span>
+                        </div>
+                        <div
+                            class="bg-cosmic-indigo text-indigo-50 px-6 py-4 rounded-2xl rounded-tl-none max-w-[85%] shadow-xl">
+                            <p class="text-base font-medium leading-relaxed">
+                                Excellent observation. The dynamic warm-up we added clearly helped activate the kinetic
+                                chain. Your efficiency rating was 4.2% higher than your average for this pace.
+                            </p>
+                            <div class="mt-4 pt-4 border-t border-indigo-400/30">
+                                <p class="text-sm opacity-90 font-bold mb-2">Recovery Focus:</p>
+                                <div class="bg-indigo-950/40 p-3 rounded-lg flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-ignite-orange">restaurant</span>
+                                    <p class="text-sm">High-protein meal with antioxidants recommended in the next 45
+                                        minutes to maximize recovery window.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <aside class="lg:col-span-4 space-y-6">
+                <div class="flex items-center gap-3 px-2">
+                    <span class="material-symbols-outlined text-ignite-orange">bar_chart</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Weekly Tracker</h2>
+                </div>
+                <div
+                    class="glass bg-slate-900/60 rounded-3xl p-8 border-white/10 relative overflow-hidden flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-widest text-slate-400">Weekly Progress</p>
+                            <div class="flex items-baseline gap-1 mt-1 font-mono">
+                                <span class="text-4xl font-black text-ignite-orange">54</span>
+                                <span class="text-xl font-bold text-slate-500">/ 60</span>
+                                <span
+                                    class="text-xs font-bold ml-1 text-slate-400 uppercase tracking-tighter">pts</span>
+                            </div>
+                        </div>
+                        <div class="relative w-20 h-20 flex items-center justify-center">
+                            <svg class="w-full h-full">
+                                <circle class="text-white/5" cx="40" cy="40" fill="transparent" r="35"
+                                    stroke="currentColor" stroke-width="6"></circle>
+                                <circle class="text-ignite-orange progress-ring-circle" cx="40" cy="40"
+                                    fill="transparent" r="35" stroke="currentColor" stroke-dasharray="219.91"
+                                    stroke-dashoffset="21.9" stroke-linecap="round" stroke-width="6"></circle>
+                            </svg>
+                            <span class="absolute text-sm font-black text-white">90%</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-[140px] flex items-end justify-between gap-2 mb-8">
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div class="w-full bg-ignite-orange rounded-t-lg h-[75%] opacity-80"></div>
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-500">M</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div class="w-full bg-ignite-orange rounded-t-lg h-[90%] opacity-80"></div>
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-500">T</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div
+                                    class="w-full bg-ignite-orange rounded-t-lg h-[100%] shadow-[0_0_15px_rgba(249,116,21,0.5)]">
+                                </div>
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-ignite-orange">W</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-600">T</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-600">F</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-600">S</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2 h-full">
+                            <div
+                                class="w-full bg-white/5 rounded-xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[9px] font-black uppercase text-slate-600">S</span>
+                        </div>
+                    </div>
+                    <div class="bg-ignite-orange/10 p-4 rounded-xl border border-ignite-orange/20">
+                        <p
+                            class="text-[10px] font-black text-ignite-orange uppercase tracking-[0.2em] mb-2 text-center">
+                            Elite Streak</p>
+                        <div class="flex justify-center -space-x-2">
+                            <div
+                                class="w-8 h-8 rounded-full bg-ignite-orange flex items-center justify-center border-2 border-deep-slate">
+                                <span class="material-symbols-outlined text-xs">grade</span></div>
+                            <div
+                                class="w-8 h-8 rounded-full bg-ignite-orange flex items-center justify-center border-2 border-deep-slate">
+                                <span class="material-symbols-outlined text-xs">grade</span></div>
+                            <div
+                                class="w-8 h-8 rounded-full bg-ignite-orange flex items-center justify-center border-2 border-deep-slate">
+                                <span class="material-symbols-outlined text-xs">grade</span></div>
+                            <div
+                                class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border-2 border-deep-slate border-dashed">
+                                <span class="material-symbols-outlined text-xs text-slate-600">add</span></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+        <section class="space-y-6">
+            <div class="flex items-center justify-between px-2">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-ignite-orange">calendar_today</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">The Road Ahead</h2>
+                </div>
+                <button class="text-sm font-bold text-ignite-orange hover:underline">Full Training Plan</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass bg-white/5 p-6 rounded-2xl border-l-4 border-ignite-orange relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-2 opacity-5">
+                        <span class="material-symbols-outlined text-4xl">timer</span>
+                    </div>
+                    <p class="text-xs font-black text-ignite-orange uppercase tracking-widest">Tomorrow</p>
+                    <h4 class="text-xl font-bold mt-2 text-white">Active Recovery</h4>
+                    <p class="text-sm text-slate-400 mt-1">Light Cross-Training • 30m</p>
+                    <div
+                        class="mt-4 inline-block px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-slate-300">
+                        Keep HR &lt; 120 bpm
+                    </div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Friday</p>
+                    <h4 class="text-xl font-bold mt-2 text-white">Threshold Session</h4>
+                    <p class="text-sm text-slate-400 mt-1">Intervals • 6:00 AM</p>
+                    <div class="mt-4 flex items-center gap-2">
+                        <span
+                            class="text-[10px] font-bold px-3 py-1 bg-ignite-orange/10 rounded-full text-ignite-orange">Hard
+                            Effort</span>
+                    </div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl opacity-60">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Saturday</p>
+                    <h4 class="text-xl font-bold mt-2 text-white">Long Base Run</h4>
+                    <p class="text-sm text-slate-400 mt-1">Endurance • 7:00 AM</p>
+                    <div class="mt-4 inline-block px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold">18.5 km</div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl opacity-40">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Sunday</p>
+                    <h4 class="text-xl font-bold mt-2 text-white">Full Rest</h4>
+                    <p class="text-sm text-slate-400 mt-1">Total Recovery</p>
+                    <div class="mt-4 flex items-center gap-1 text-emerald-500">
+                        <span class="material-symbols-outlined text-sm">spa</span>
+                        <span class="text-[10px] font-bold">Restored</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="mt-20 py-12 border-t border-white/5 bg-black/40">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="flex items-center gap-3 opacity-60">
+                <div class="w-8 h-8 bg-slate-400 rounded-lg flex items-center justify-center text-deep-slate">
+                    <span class="material-symbols-outlined font-bold text-sm">shadow</span>
+                </div>
+                <p class="text-sm font-bold tracking-tight uppercase text-white">Eclipse Performance</p>
+            </div>
+            <p class="text-sm opacity-40">© 2024 Eclipse Performance. Fueling Your Next PB.</p>
+            <div class="flex gap-8">
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Privacy</a>
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Terms</a>
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Support</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>
+tailwind.config = {
+darkMode: "class",
+theme: {
+extend: {
+colors: {
+"primary": "#f97415",
+"background-light": "#f8f7f5",
+"background-dark": "#0F172A",
+"cosmic-indigo": "#312e81",
+"glass-slate": "rgba(30, 41, 59, 0.7)",
+},
+fontFamily: {
+"display": ["Inter", "sans-serif"]
+},
+borderRadius: {
+"DEFAULT": "0.25rem",
+"lg": "0.5rem",
+"xl": "0.75rem",
+"full": "9999px"
+},
+},
+},
+}
+</script>
+<style type="text/tailwindcss">
+    .glass {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-orange {
+            box-shadow: 0 0 30px rgba(249, 116, 21, 0.2);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .mood-btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen font-display">
+    <header class="sticky top-0 z-50 glass bg-white/10 dark:bg-black/20 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                    <span class="material-symbols-outlined font-bold">shadow</span>
+                </div>
+                <h1 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">ECLIPSE <span
+                        class="text-primary">PERFORMANCE</span></h1>
+            </div>
+            <nav class="hidden md:flex items-center gap-10">
+                <a class="text-sm font-semibold hover:text-primary transition-colors" href="#">Daily Plan</a>
+                <a class="text-sm font-semibold hover:text-primary transition-colors opacity-70" href="#">Training
+                    History</a>
+                <a class="text-sm font-semibold hover:text-primary transition-colors opacity-70" href="#">Analytics</a>
+                <a class="text-sm font-semibold hover:text-primary transition-colors opacity-70" href="#">Community</a>
+            </nav>
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-full">
+                    <span class="material-symbols-outlined text-primary text-xl">local_fire_department</span>
+                    <span class="text-sm font-bold text-primary">12 DAY STREAK</span>
+                </div>
+                <div class="flex items-center gap-3 border-l border-white/10 pl-6">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5">
+                        <span class="material-symbols-outlined">notifications</span>
+                    </button>
+                    <div class="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
+                        <img alt="User profile" class="w-full h-full object-cover"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSGjJQ7alGPjUpRGQ1GGly2R8Lu5TEofmMdmLhmJNVglWOrY5QAFt1CpDmrBMuJmjVVEWpz8sHD98VxFcl1IvOd3z2ROF9l7QUNy_B2CLb869lP5qq84sf65xZuQ00SWlFbRX0mHKB6fwKCRNKzFhGYGO9a5dt80Ywtdbrr0hDv3P3qFna7JYNPZQ6O-jpaMvPyGG76m3PiGUOdMqukvUp1M7TdhARShoJg0MpbVyyusafPvOWemy6lXbCFDSZNUTsDBATak9o-z0" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="max-w-7xl mx-auto px-6 py-10 space-y-12">
+        <section class="space-y-6">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div class="space-y-2">
+                    <h2 class="text-5xl font-black tracking-tight text-slate-900 dark:text-white">Good Morning, <span
+                            class="text-primary">Alex!</span></h2>
+                    <p class="text-lg font-medium text-slate-500 dark:text-slate-400">Ready to crush it? Let's see how
+                        we're fueling the engine today.</p>
+                </div>
+                <div class="glass bg-white/5 p-4 rounded-2xl border-white/10 min-w-[320px]">
+                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 ml-1">How are you feeling
+                        today?</p>
+                    <div class="flex gap-2">
+                        <button
+                            class="mood-btn flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all">
+                            <span class="material-symbols-outlined text-emerald-500">sentiment_very_satisfied</span>
+                            <span class="text-[10px] font-bold text-emerald-500 uppercase">Energized</span>
+                        </button>
+                        <button
+                            class="mood-btn flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all">
+                            <span class="material-symbols-outlined text-primary">sentiment_satisfied</span>
+                            <span class="text-[10px] font-bold text-primary uppercase">Okay</span>
+                        </button>
+                        <button
+                            class="mood-btn flex-1 flex flex-col items-center gap-1 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all">
+                            <span class="material-symbols-outlined text-rose-500">sentiment_dissatisfied</span>
+                            <span class="text-[10px] font-bold text-rose-500 uppercase">Tired</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="space-y-6">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary">stars</span>
+                <h3 class="text-2xl font-bold dark:text-white tracking-tight">Today's Recommended Workout</h3>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 relative group overflow-hidden rounded-3xl glow-orange">
+                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuApvg49L3qSHo7b4cy73edJZn_QNShz8GVmtEyhDv08Z0cnlLap6RiRHxGdjX8jTg7no9KqnXA7r07_fBjQiKEzgMCp98LDWvA6amaCdydlEW8vQWHRTH9KPiv6wT8aX5ZYNWfbM34hT216O9S6pw08XZ2yPMhUTMy-z271rB7TJqcln4SrtPx33anNHBCIUTTMDn3tscXc32xK_37cA-PiJzdmyz8Y_5fgGHTF7dt2HQ8d2jzV0Yq0Bn7l-Rgbhr1df9pIKf4mM7E');">
+                    </div>
+                    <div
+                        class="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/60 to-transparent">
+                    </div>
+                    <div class="relative h-full p-8 md:p-10 flex flex-col justify-end min-h-[400px]">
+                        <div class="absolute top-8 left-8">
+                            <span
+                                class="bg-primary text-white text-[11px] font-black uppercase px-4 py-1.5 rounded-full flex items-center gap-1 shadow-xl">
+                                <span class="material-symbols-outlined text-sm">bolt</span>
+                                COACH RECOMMENDED
+                            </span>
+                        </div>
+                        <div class="space-y-6 max-w-2xl">
+                            <div>
+                                <span class="text-primary font-bold tracking-widest uppercase text-sm">Intensity 2 •
+                                    Aerobic Base</span>
+                                <h4 class="text-4xl md:text-5xl font-black text-white mt-2">Moderate Steady Run</h4>
+                                <p class="text-lg text-slate-200 mt-4 leading-relaxed opacity-90">Focus on consistent
+                                    breathing and a stable heart rate. This session builds the foundation for your next
+                                    race weekend.</p>
+                            </div>
+                            <div class="grid grid-cols-3 gap-4 border-y border-white/10 py-6">
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-tighter">Target
+                                        Pace</span>
+                                    <span class="text-2xl font-bold text-white">5:15 - 5:30 <span
+                                            class="text-xs opacity-50">/km</span></span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-tighter">Est.
+                                        Distance</span>
+                                    <span class="text-2xl font-bold text-white">8.5 <span
+                                            class="text-xs opacity-50">km</span></span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span
+                                        class="text-xs font-bold text-slate-400 uppercase tracking-tighter">Duration</span>
+                                    <span class="text-2xl font-bold text-white">45 <span
+                                            class="text-xs opacity-50">min</span></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <button
+                                    class="flex-1 md:flex-none bg-primary hover:bg-orange-600 text-white font-black py-4 px-10 rounded-2xl transition-all shadow-lg shadow-primary/30 active:scale-95 text-lg">
+                                    Start Session
+                                </button>
+                                <button
+                                    class="p-4 rounded-2xl border border-white/20 text-white hover:bg-white/10 transition-colors">
+                                    <span class="material-symbols-outlined">playlist_add</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <p class="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Alternative Intensities
+                    </p>
+                    <div
+                        class="glass bg-white/5 p-5 rounded-2xl border-white/10 group cursor-pointer hover:bg-white/10 transition-all flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                                <span class="material-symbols-outlined">spa</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Intensity 1
+                                </p>
+                                <h5 class="font-bold text-white">Active Recovery</h5>
+                                <p class="text-xs text-slate-400">25 min • Easy Pace</p>
+                            </div>
+                        </div>
+                        <span
+                            class="material-symbols-outlined text-slate-600 group-hover:text-white transition-colors">chevron_right</span>
+                    </div>
+                    <div
+                        class="glass bg-white/5 p-5 rounded-2xl border-white/10 group cursor-pointer hover:bg-white/10 transition-all flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-500">
+                                <span class="material-symbols-outlined">speed</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Intensity 3</p>
+                                <h5 class="font-bold text-white">Threshold Intervals</h5>
+                                <p class="text-xs text-slate-400">60 min • 4:20 Pace</p>
+                            </div>
+                        </div>
+                        <span
+                            class="material-symbols-outlined text-slate-600 group-hover:text-white transition-colors">chevron_right</span>
+                    </div>
+                    <div class="mt-auto bg-cosmic-indigo/30 p-5 rounded-2xl border border-indigo-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="material-symbols-outlined text-indigo-400 text-sm">info</span>
+                            <span class="text-xs font-bold text-indigo-300 uppercase">Coach's Tip</span>
+                        </div>
+                        <p class="text-xs text-indigo-100 leading-relaxed italic">" Alex, stick to the moderate run
+                            today. Your HRV is trending slightly down, but your muscles are primed for a steady aerobic
+                            push. Don't overdo the pace!"</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <section class="lg:col-span-8 space-y-6">
+                <div class="flex items-center gap-3 px-2">
+                    <span class="material-symbols-outlined text-primary">psychology</span>
+                    <h2 class="text-2xl font-bold dark:text-white tracking-tight">Coach Insight</h2>
+                </div>
+                <div
+                    class="glass bg-white/5 dark:bg-slate-900/50 rounded-3xl p-6 md:p-8 space-y-6 border-white/5 h-full">
+                    <div class="flex justify-end">
+                        <div
+                            class="bg-slate-700/50 text-slate-200 px-6 py-4 rounded-2xl rounded-tr-none max-w-[80%] border border-white/5">
+                            <p class="text-base">Legs feel heavy this morning, especially my calves. Should I still go
+                                for the moderate run?</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div
+                            class="w-10 h-10 rounded-full bg-cosmic-indigo flex-shrink-0 flex items-center justify-center text-white shadow-lg">
+                            <span class="material-symbols-outlined text-xl">auto_awesome</span>
+                        </div>
+                        <div
+                            class="bg-cosmic-indigo text-indigo-50 px-6 py-4 rounded-2xl rounded-tl-none max-w-[85%] shadow-xl">
+                            <p class="text-base font-medium leading-relaxed">
+                                I've noted the localized calf fatigue. Based on your HRV (64ms) and yesterday's
+                                workload, we should adjust.
+                            </p>
+                            <div class="mt-4 pt-4 border-t border-indigo-400/30 flex flex-col gap-3">
+                                <p class="text-sm opacity-90">Proposed Adjustment:</p>
+                                <div class="bg-indigo-950/40 p-3 rounded-lg flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-primary">tune</span>
+                                    <p class="text-sm">Add a 10-minute dynamic warm-up extension focusing on myofascial
+                                        release. If fatigue persists after 10 mins of running, we'll auto-downgrade to
+                                        Recovery.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-4">
+                        <button
+                            class="px-5 py-2.5 rounded-full border border-white/10 hover:bg-white/5 text-sm font-bold transition-all text-slate-700 dark:text-slate-300">Accept
+                            adjustment</button>
+                        <button
+                            class="px-5 py-2.5 rounded-full border border-white/10 hover:bg-white/5 text-sm font-bold transition-all text-slate-700 dark:text-slate-300">Show
+                            warm-up video</button>
+                        <button
+                            class="px-5 py-2.5 rounded-full border border-white/10 hover:bg-white/5 text-sm font-bold transition-all text-slate-700 dark:text-slate-300">Switch
+                            to Recovery</button>
+                    </div>
+                </div>
+            </section>
+            <aside class="lg:col-span-4 space-y-6">
+                <div class="flex items-center gap-3 px-2">
+                    <span class="material-symbols-outlined text-primary">bar_chart</span>
+                    <h2 class="text-2xl font-bold dark:text-white tracking-tight">Weekly Tracker</h2>
+                </div>
+                <div
+                    class="glass bg-white/5 dark:bg-slate-900/60 rounded-3xl p-8 border-white/10 relative overflow-hidden flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-widest text-slate-400">Weekly Goal</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-4xl font-black text-primary">42</span>
+                                <span class="text-xl font-bold text-slate-500">/ 60</span>
+                                <span
+                                    class="text-xs font-bold ml-1 text-slate-400 uppercase tracking-tighter">pts</span>
+                            </div>
+                        </div>
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <svg class="w-full h-full">
+                                <circle class="text-white/5" cx="48" cy="48" fill="transparent" r="42"
+                                    stroke="currentColor" stroke-width="8"></circle>
+                                <circle class="text-primary progress-ring-circle" cx="48" cy="48" fill="transparent"
+                                    r="42" stroke="currentColor" stroke-dasharray="263.89" stroke-dashoffset="79.16"
+                                    stroke-linecap="round" stroke-width="8"></circle>
+                            </svg>
+                            <span class="absolute text-lg font-black text-white">70%</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-[160px] flex items-end justify-between gap-3 mb-8">
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div
+                                    class="w-full bg-gradient-to-t from-orange-600 to-primary rounded-t-xl transition-all duration-700 h-[75%]">
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-500">M</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div
+                                    class="w-full bg-gradient-to-t from-orange-600 to-primary rounded-t-xl transition-all duration-700 h-[90%]">
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-500">T</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative overflow-hidden flex flex-col justify-end h-full border border-white/5">
+                                <div
+                                    class="w-full bg-gradient-to-t from-orange-600 to-primary rounded-t-xl transition-all duration-700 h-[45%]">
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-primary">W</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-600">T</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-600">F</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-600">S</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-3 h-full group">
+                            <div
+                                class="w-full bg-white/5 rounded-2xl relative h-full border border-white/5 border-dashed">
+                            </div>
+                            <span class="text-[10px] font-black uppercase text-slate-600">S</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Intensity Breakdown
+                        </p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <span class="block text-[10px] font-bold text-emerald-500 mb-1">LVL 1</span>
+                                <span class="text-xl font-black text-white">12</span>
+                            </div>
+                            <div class="bg-white/5 p-3 rounded-xl border border-primary/20 bg-primary/5">
+                                <span class="block text-[10px] font-bold text-primary mb-1">LVL 2</span>
+                                <span class="text-xl font-black text-white">20</span>
+                            </div>
+                            <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <span class="block text-[10px] font-bold text-rose-500 mb-1">LVL 3</span>
+                                <span class="text-xl font-black text-white">10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+        <section class="space-y-6">
+            <div class="flex items-center justify-between px-2">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary">calendar_today</span>
+                    <h2 class="text-2xl font-bold dark:text-white tracking-tight">The Road Ahead</h2>
+                </div>
+                <button class="text-sm font-bold text-primary hover:underline">View Full Calendar</button>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass bg-white/5 p-6 rounded-2xl border-l-4 border-orange-500">
+                    <p class="text-xs font-black text-primary uppercase tracking-widest">Tomorrow</p>
+                    <h4 class="text-xl font-bold mt-2 text-slate-900 dark:text-white">Speed Intervals</h4>
+                    <p class="text-sm opacity-60 mt-1 dark:text-slate-400">Track Session • 5:00 AM</p>
+                    <div class="mt-4 flex items-center gap-2">
+                        <span class="text-[10px] font-bold px-3 py-1 bg-primary/10 rounded-full text-primary">12km
+                            Total</span>
+                    </div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl">
+                    <p class="text-xs font-bold opacity-50 uppercase tracking-widest text-slate-400">Saturday</p>
+                    <h4 class="text-xl font-bold mt-2 text-slate-900 dark:text-white">Base Endurance</h4>
+                    <p class="text-sm opacity-60 mt-1 dark:text-slate-400">Road • 7:00 AM</p>
+                    <div class="mt-4 flex items-center gap-2">
+                        <span
+                            class="text-[10px] font-bold px-3 py-1 bg-white/5 rounded-full dark:text-slate-200">24km</span>
+                    </div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl opacity-80">
+                    <p class="text-xs font-bold opacity-50 uppercase tracking-widest text-slate-400">Sunday</p>
+                    <h4 class="text-xl font-bold mt-2 text-slate-900 dark:text-white">Active Rest</h4>
+                    <p class="text-sm opacity-60 mt-1 dark:text-slate-400">Yoga &amp; Stretching</p>
+                    <div class="mt-4 flex items-center gap-2 text-emerald-400">
+                        <span class="material-symbols-outlined text-sm">spa</span>
+                        <span class="text-[10px] font-bold uppercase">Recovery</span>
+                    </div>
+                </div>
+                <div class="glass bg-white/5 p-6 rounded-2xl opacity-60">
+                    <p class="text-xs font-bold opacity-50 uppercase tracking-widest text-slate-400">Monday</p>
+                    <h4 class="text-xl font-bold mt-2 text-slate-900 dark:text-white">Base Run</h4>
+                    <p class="text-sm opacity-60 mt-1 dark:text-slate-400">Steady • 6:00 AM</p>
+                    <div class="mt-4 flex items-center gap-2">
+                        <span
+                            class="text-[10px] font-bold px-3 py-1 bg-white/5 rounded-full dark:text-slate-200">8km</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="mt-20 py-12 border-t border-white/5 bg-black/10">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="flex items-center gap-3 opacity-50">
+                <div class="w-8 h-8 bg-slate-400 rounded-lg flex items-center justify-center text-background-dark">
+                    <span class="material-symbols-outlined font-bold text-sm">shadow</span>
+                </div>
+                <p class="text-sm font-bold tracking-tight uppercase">Eclipse Performance</p>
+            </div>
+            <p class="text-sm opacity-40">© 2024 Eclipse Performance. All rights reserved.</p>
+            <div class="flex gap-8">
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Privacy</a>
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Terms</a>
+                <a class="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                    href="#">Support</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>
