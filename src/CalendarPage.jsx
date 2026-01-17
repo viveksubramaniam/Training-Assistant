@@ -107,12 +107,27 @@ const CalendarPage = () => {
     };
 
     const volumeBars = getVolumeData();
+    const plannedDistance = weeklyPlan?.days?.reduce((acc, day) => acc + (day.distance || 0), 0) || 0;
 
     // Helper for rendering difficulty dots/badges
-    const renderIntensity = (label) => {
-        const color = label === 'High' || label === 'Intense' ? 'text-rose-500' :
-            label === 'Moderate' ? 'text-ignite-orange' : 'text-emerald-500';
-        return <span className={`text-[9px] font-bold uppercase mb-0.5 ${color}`}>{label || 'Moderate'}</span>;
+    const renderIntensity = (day) => {
+        // 1=Easy (Green), 2=Moderate (Orange), 3=Intense (Red)
+        // Check for numeric intensity first, then fallback to label
+        let color = 'text-emerald-500';
+        let label = 'Easy';
+
+        const intensity = day.intensity;
+        const labelStr = (day.intensityLabel || "").toLowerCase();
+
+        if (intensity === 2 || labelStr === 'moderate') {
+            color = 'text-ignite-orange';
+            label = 'Moderate';
+        } else if (intensity === 3 || labelStr === 'high' || labelStr === 'intense' || labelStr === 'hard') {
+            color = 'text-rose-500';
+            label = 'Intense';
+        }
+
+        return <span className={`text-[9px] font-bold uppercase mb-0.5 ${color}`}>{label}</span>;
     };
 
     if (loading) {
@@ -170,7 +185,7 @@ const CalendarPage = () => {
                             <div className="px-4 flex justify-between items-center">
                                 <span className="text-[10px] font-mono text-ignite-orange font-bold uppercase">Week {String(currentWeekNum).padStart(2, '0')} (Current)</span>
                                 <span className="text-[10px] text-slate-400 uppercase tracking-widest">
-                                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { day: 'numeric' })}
+                                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { day: 'numeric' })} • {plannedDistance.toFixed(1)} km
                                 </span>
                             </div>
 
@@ -198,7 +213,7 @@ const CalendarPage = () => {
                                                 {day.workout_type === 'Rest' ? (
                                                     <p className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">Rest Day</p>
                                                 ) : (
-                                                    renderIntensity(day.intensityLabel)
+                                                    renderIntensity(day)
                                                 )}
                                                 <h4 className="font-bold text-xs leading-tight h-8 line-clamp-2 text-white">
                                                     {day.title || day.workout_type}
@@ -304,7 +319,11 @@ const CalendarPage = () => {
 
                 {/* Existing Views */}
                 {activeTab === 'month' && <MonthView masterPlan={masterPlan} />}
-                {activeTab === 'phases' && <TrainingPhasesView masterPlan={masterPlan} />}
+                {activeTab === 'phases' && (
+                    <div className="px-4">
+                        <TrainingPhasesView masterPlan={masterPlan} />
+                    </div>
+                )}
             </main>
         </div>
     );

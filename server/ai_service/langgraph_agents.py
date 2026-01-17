@@ -293,8 +293,8 @@ Create a periodized plan with phases:
 Respond with ONLY valid JSON, dont enter newlines or extra spaces:
 {{
   "weeks": [
-    {{"week": 1, "theme": "Base Building", "focus": "Aerobic foundation", "targetKm": 30, "keyWorkouts": ["Long run", "Easy runs"]}},
-    {{"week": 2, "theme": "Base Building", "focus": "Volume increase", "targetKm": 35, "keyWorkouts": ["Long run", "Tempo"]}},
+    {{"week": 1, "theme": "Base Building", "focus": "Aerobic foundation", "targetKm": 30, "numWorkouts": 5, "numRestDays": 2, "keyWorkouts": ["Long run", "Easy runs"]}},
+    {{"week": 2, "theme": "Base Building", "focus": "Volume increase", "targetKm": 35, "numWorkouts": 5, "numRestDays": 2, "keyWorkouts": ["Long run", "Tempo"]}},
     ...
   ],
   "total_weeks": {total_weeks},
