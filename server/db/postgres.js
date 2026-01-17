@@ -54,8 +54,10 @@ export const getActivity = async (userId, activityId) => {
     if (activity.hasDetailedData) {
         const streams = await getActivityStreams(activityId);
         activity.streams = streams;
+        console.log(`[DB] Fetched streams for ${activityId}:`, Object.keys(streams));
     }
 
+    console.log(`[DB] Retrieved activity ${activityId}, hasDetailed: ${activity.hasDetailedData}, Map:`, !!activity.map);
     return activity;
 };
 
@@ -227,6 +229,8 @@ export const updateActivity = async (userId, activityId, updates) => {
             JSON.stringify(updates.laps),
             updates.gear?.id
         ]);
+
+        console.log(`[DB] Upserted details for ${activityId}. Map present in updates:`, !!updates.map);
 
         // Save streams if present
         if (updates.streams) {
@@ -815,7 +819,14 @@ export const saveMasterPlan = async (goalId, planData) => {
                 peak_week = EXCLUDED.peak_week,
                 taper_start_week = EXCLUDED.taper_start_week,
                 generated_at = NOW()
-        `, [goalId, JSON.stringify(planData.weeks), planData.totalWeeks, planData.peakWeek, planData.taperStart || planData.taperStartWeek, planData.model || 'local']);
+        `, [
+            goalId,
+            JSON.stringify(planData.weeks),
+            planData.totalWeeks || planData.total_weeks,
+            planData.peakWeek || planData.peak_week,
+            planData.taperStart || planData.taperStartWeek || planData.taper_start_week,
+            planData.model || 'local'
+        ]);
         console.log('Master plan saved to DB successfully');
     } catch (err) {
         console.error('DB Error saving master plan:', err);
@@ -845,7 +856,7 @@ export const clearUserCaches = async (userId) => {
         // But master_plans stores goal_id, not user_id. We need to join or assume goals.js handles goal deletion
 
         // Wait, getting user's active goal to clear its master plan
-        const result = await pool.query(`SELECT id FROM goals WHERE user_id = $1`, [userId]);
+        const result = await pool.query(`SELECT id FROM user_goals WHERE user_id = $1`, [userId]);
         const goalIds = result.rows.map(r => r.id);
 
         if (goalIds.length > 0) {

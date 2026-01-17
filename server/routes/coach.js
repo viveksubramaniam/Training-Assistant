@@ -135,6 +135,101 @@ router.post('/sync', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/coach/regenerate
+ * Force regenerate all plans after goal change
+ */
+router.post('/regenerate', requireAuth, async (req, res) => {
+    const userId = req.session.stravaId;
+    console.log(`[Regenerate] Force regenerating plans for user ${userId}`);
+
+    try {
+        const goal = await db.getActiveGoal(userId);
+        if (!goal) {
+            return res.status(400).json({ error: 'No active goal found' });
+        }
+
+        // Get recent activities for context
+        const recentActivities = await db.getRecentActivities(userId, 7);
+        const activitiesSummary = recentActivities.map(a => ({
+            date: a.start_date,
+            distance: a.distance,
+            duration: a.moving_time,
+            type: a.sport_type
+        }));
+
+        console.log(`[Regenerate] Calling AI service with forceRegenerate=true...`);
+        const response = await axios.post(`${AI_SERVICE_URL}/orchestrate`, {
+            userId: String(userId),
+            goal: {
+                type: goal.goal_type,
+                targetDate: goal.target_date,
+                weeklyTarget: goal.weekly_target_distance,
+                preferredDays: goal.preferred_workout_days
+            },
+            masterPlan: null, // Force regeneration
+            weeklyPlan: null, // Force regeneration
+            recentActivities: activitiesSummary,
+            forceRegenerate: true
+        }, { timeout: 120000 });
+
+        const responseData = response.data;
+        // The API might return { result: ... } or just the result object directly
+        const result = responseData.result || responseData;
+
+        console.log('[Regenerate] Response Keys:', Object.keys(responseData));
+        if (result !== responseData) console.log('[Regenerate] Result Keys:', Object.keys(result));
+
+        // Python returns camelCase "masterPlan" in prepare_result, but let's be safe
+        const newMasterPlan = result.masterPlan || result.master_plan || responseData.masterPlan || responseData.master_plan;
+
+        if (newMasterPlan) {
+            console.log('[Regenerate] newMasterPlan object found. Weeks:', newMasterPlan.weeks?.length);
+        } else {
+            console.log('[Regenerate] newMasterPlan is null/undefined');
+        }
+
+        const weeklyPlan = result.weeklyPlan || result.weekly_plan || responseData.weeklyPlan || responseData.weekly_plan;
+        const dailyPlan = result.dailyPlan || result.daily_plan || responseData.dailyPlan || responseData.daily_plan;
+
+        // Cache the new plans
+        const weekStart = getWeekStart();
+        if (weeklyPlan) {
+            console.log(`[Regenerate] Caching new weekly plan`);
+            await db.cacheWeeklyPlan(userId, weekStart, weeklyPlan);
+        }
+
+        if (dailyPlan) {
+            console.log(`[Regenerate] Caching new daily plan`);
+            const today = new Date().toISOString().split('T')[0];
+            await db.cacheDailyPlan(userId, today, dailyPlan);
+        }
+
+        // Save master plan if returned
+        if (newMasterPlan && newMasterPlan.weeks) {
+            console.log(`[Regenerate] Saving new master plan`);
+            await db.saveMasterPlan(goal.id, newMasterPlan);
+        }
+
+        console.log(`[Regenerate] Plan regeneration complete for user ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'Plans regenerated successfully',
+            hasMasterPlan: !!newMasterPlan,
+            hasWeeklyPlan: !!weeklyPlan,
+            hasDailyPlan: !!dailyPlan
+        });
+
+    } catch (error) {
+        console.error('[Regenerate] Failed:', error.message);
+        res.status(500).json({
+            error: 'Failed to regenerate plans',
+            details: error.message
+        });
+    }
+});
+
+/**
  * GET /api/coach/daily-plan
  * Returns daily workout (Non-blocking)
  */
@@ -216,7 +311,7 @@ router.get('/master-plan', requireAuth, async (req, res) => {
         const goalStart = new Date(goal.created_at);
         const currentWeek = Math.floor((new Date() - goalStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
 
-        res.json({ ...masterPlan, currentWeek });
+        res.json({ ...masterPlan, currentWeek, startDate: goal.created_at });
     } catch (error) {
         console.error('Fetch master plan failed:', error);
         res.status(500).json({ error: 'Failed to fetch master plan' });

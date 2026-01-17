@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+@theme {
+    --color-primary: #f97415;
+    --color-ignite-orange: #f97415;
+    --color-background-dark: #0f172a;
+    --color-deep-slate: #070c1b;
+    --color-glass-slate: rgba(30, 41, 59, 0.7);
+    --color-slate-card: rgba(30, 41, 59, 0.7);
+    --color-cosmic-indigo: #818CF8;
+    --color-emerald-accent: #10b981;
+    --color-rose-accent: #f43f5e;
+
+    --font-display: "Space Grotesk", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+}
+
 /* ============================================
    ECLIPSE PERFORMANCE THEME
    ============================================ */
@@ -10,28 +25,31 @@ html {
 }
 
 body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background-color: #0f172a;
+    font-family: var(--font-display);
+    background-color: var(--color-deep-slate);
     color: #f1f5f9;
 }
 
-/* CSS Custom Properties */
-:root {
-    --color-primary: #f97415;
-    --color-background-dark: #0f172a;
-    --color-cosmic-indigo: #818CF8;
-    --color-slate-card: rgba(30, 41, 59, 0.7);
+/* Glass morphism */
+.glass {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Glass morphism card */
 .glass-card {
-    background: rgba(30, 41, 59, 0.6);
+    background: var(--color-glass-slate);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Glass metric bar (for map overlay) */
+.glass-panel {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .glass-metric {
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(12px);
@@ -39,25 +57,30 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* HR Zone gradient bar */
-.hr-gradient {
-    background: linear-gradient(90deg, #3b82f6 0%, #10b981 25%, #facc15 50%, #f97316 75%, #ef4444 100%);
+/* Utility Animations */
+.animate-spin-slow {
+    animation: spin-slow 8s linear infinite;
 }
 
-/* Chart grid background */
-.chart-grid {
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
+@keyframes spin-slow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-/* Glow path for SVG route overlays */
-.glow-path {
-    filter: drop-shadow(0 0 4px #f97415);
+.glow-orange {
+    box-shadow: 0 0 15px rgba(249, 116, 21, 0.2);
 }
 
-/* AI Pulse glowing border effect */
+.active-day-glow {
+    box-shadow: 0 0 15px rgba(249, 116, 21, 0.15);
+    border: 1px solid rgba(249, 116, 21, 0.5);
+}
+
 .ai-pulse-border {
     position: relative;
 }
@@ -86,30 +109,32 @@ body {
     }
 }
 
-/* Slow spin animation for loading icons */
-@keyframes spin-slow {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+/* Utility Classes */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
 }
 
-.animate-spin-slow {
-    animation: spin-slow 8s linear infinite;
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
-/* Status badge glow effects */
-.badge-glow-indigo {
-    box-shadow: 0 0 10px rgba(129, 140, 248, 0.3);
+.snap-x {
+    scroll-snap-type: x mandatory;
 }
 
-.badge-glow-emerald {
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+.snap-center {
+    scroll-snap-align: center;
 }
 
-.badge-glow-amber {
-    box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+.hr-gradient {
+    background: linear-gradient(90deg, #3b82f6 0%, #10b981 25%, #facc15 50%, #f97316 75%, #ef4444 100%);
+}
+
+.mono-data {
+    font-family: var(--font-mono);
+}
+
+.font-display {
+    font-family: var(--font-display);
 }
