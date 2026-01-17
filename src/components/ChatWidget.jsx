@@ -68,12 +68,9 @@ const ChatWidget = ({ onPlanUpdate }) => {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#818CF8] to-[#6366F1] rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-50"
+                className="fixed bottom-24 right-4 w-12 h-12 bg-primary rounded-full shadow-lg shadow-primary/40 flex items-center justify-center hover:scale-105 transition-transform z-50 border border-white/20"
             >
-                <MessageSquare className="w-6 h-6 text-white" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#f97415] rounded-full flex items-center justify-center">
-                    <Sparkles className="w-3 h-3 text-white" />
-                </span>
+                <span className="material-symbols-outlined text-white text-2xl">smart_toy</span>
             </button>
         );
     }
@@ -108,8 +105,8 @@ const ChatWidget = ({ onPlanUpdate }) => {
                     >
                         <div
                             className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${msg.role === 'user'
-                                    ? 'bg-[#818CF8] text-white rounded-br-sm'
-                                    : 'bg-slate-800 text-slate-200 rounded-bl-sm'
+                                ? 'bg-[#818CF8] text-white rounded-br-sm'
+                                : 'bg-slate-800 text-slate-200 rounded-bl-sm'
                                 }`}
                         >
                             {msg.content}

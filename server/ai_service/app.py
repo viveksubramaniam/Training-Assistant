@@ -72,7 +72,7 @@ import json
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Only log POST requests to our endpoints
-        if request.method == "POST" and request.url.path in ["/orchestrate", "/chat"]:
+        if request.method == "POST" and request.url.path in ["/orchestrate", "/chat", "/analyze"]:
             body = await request.body()
             print(f"\n{'='*60}")
             print(f"[RAW REQUEST] {request.method} {request.url.path}")
@@ -304,32 +304,62 @@ Respond with ONLY valid JSON, no other text."""
 # =============================================================================
 
 @app.post("/analyze")
-async def analyze_activity(activity: ActivityData):
+async def analyze_activity(request: dict):
     """Generate AI coaching summary for a running activity."""
     try:
+        # Handle both { activityData: {...} } and direct activity object
+        activity = request.get("activityData", request)
+        
+        # Extract fields flexibly from Strava activity format
+        activity_id = str(activity.get("id", "unknown"))
+        name = activity.get("name", activity.get("title", "Running Activity"))
+        date = activity.get("start_date", activity.get("date", "unknown"))
+        distance_m = activity.get("distance", 0)
+        distance_km = round(distance_m / 1000, 2) if isinstance(distance_m, (int, float)) else distance_m
+        moving_time = activity.get("moving_time", 0)
+        duration = f"{moving_time // 60}:{moving_time % 60:02d}" if isinstance(moving_time, (int, float)) else activity.get("duration", "unknown")
+        avg_speed = activity.get("average_speed", 0)
+        pace = f"{round(16.6667 / avg_speed, 2) if avg_speed else 0} min/km" if isinstance(avg_speed, (int, float)) and avg_speed > 0 else activity.get("pace", "unknown")
+        hr = activity.get("average_heartrate", activity.get("heartRate", "unknown"))
+        elevation = activity.get("total_elevation_gain", activity.get("elevation", 0))
+        activity_type = activity.get("type", activity.get("sport_type", "Run"))
+        
         prompt = f"""Analyze this running activity and provide expert coaching feedback.
 
-Activity: {activity.title or 'Running Activity'}
-- Date: {activity.date}
-- Distance: {activity.distance} km
-- Duration: {activity.duration}
-- Pace: {activity.pace} /km
-- Heart Rate: {activity.heartRate} bpm
-- Elevation: {activity.elevation} m
-- Type: {activity.type}
+Activity: {name}
+- Date: {date}
+- Distance: {distance_km} km
+- Duration: {duration}
+- Pace: {pace}
+- Heart Rate: {hr} bpm
+- Elevation: {elevation} m
+- Type: {activity_type}
 
-Provide a brief, encouraging analysis focusing on:
-1. Performance summary
-2. What went well
-3. One area to improve
-4. Recovery recommendations"""
+Respond with JSON containing:
+{{"runType": "descriptive name for this run type", "summary": "2-3 sentence performance summary", "highlight": "what went well", "suggestion": "one actionable improvement", "relativeEffort": "low/moderate/high"}}"""
+
+        if not OPENAI_API_KEY:
+            print("[Analyze] ERROR: OPENAI_API_KEY is not set!")
+            return {
+                "activityId": activity_id,
+                "text": "Analysis temporarily unavailable - API key not configured.",
+                "generatedAt": datetime.utcnow().isoformat(),
+                "model": MODEL_NAME,
+                "status": "error"
+            }
+
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
 
         response = requests.post(
-            LLM_ENDPOINT,
+            OPENROUTER_ENDPOINT,
+            headers=headers,
             json={
                 "model": MODEL_NAME,
                 "messages": [
-                    {"role": "system", "content": "You are an expert running coach."},
+                    {"role": "system", "content": "You are an expert running coach. Respond only with valid JSON."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.7,
@@ -341,7 +371,7 @@ Provide a brief, encouraging analysis focusing on:
         analysis = response.json()["choices"][0]["message"]["content"]
         
         return {
-            "activityId": activity.id,
+            "activityId": activity_id,
             "text": analysis,
             "generatedAt": datetime.utcnow().isoformat(),
             "model": MODEL_NAME,
@@ -349,8 +379,9 @@ Provide a brief, encouraging analysis focusing on:
         }
         
     except Exception as e:
+        print(f"[Analyze] Error: {e}")
         return {
-            "activityId": activity.id,
+            "activityId": request.get("activityData", request).get("id", "unknown"),
             "text": "Analysis temporarily unavailable.",
             "generatedAt": datetime.utcnow().isoformat(),
             "model": MODEL_NAME,

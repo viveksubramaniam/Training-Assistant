@@ -1,540 +1,512 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, MapPin, TrendingUp, Activity, Flame, Target, Clock, Zap, Heart, Monitor, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Share, MoreVertical, Zap, Activity, Flame, Heart, Timer, TrendingUp, Mountain, Thermometer, Footprints, Sparkles, Loader2 } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import polyline from '@mapbox/polyline';
 
-const ActivityDetailPage = ({ activity, onBack, details, analyzing, loadingDetails, handleAnalyze, aiAnalysis }) => {
+// Rolling average helper for smooth charts
+const rollingAverage = (data, windowSize = 15) => {
+    if (!data || data.length === 0) return data;
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+        const start = Math.max(0, i - Math.floor(windowSize / 2));
+        const end = Math.min(data.length, i + Math.ceil(windowSize / 2));
+        const window = data.slice(start, end).filter(v => v !== null && v !== undefined);
+        result.push(window.length > 0 ? window.reduce((a, b) => a + b, 0) / window.length : null);
+    }
+    return result;
+};
 
-    // Check if activity has map data
+const ActivityDetailPage = ({ activity, onClose }) => {
+    const [details, setDetails] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('analysis'); // analysis, splits, segments
+    const [aiSummary, setAiSummary] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            console.log('[ActivityDetailPage] Fetching details for activity:', activity.id);
+            try {
+                // Fetch activity details and AI summary in parallel
+                const [detailsRes, summaryRes] = await Promise.all([
+                    fetch(`/api/activities/${activity.id}`, { credentials: 'include' }),
+                    fetch(`/api/activities/${activity.id}/analysis`, { credentials: 'include' }).catch(() => null)
+                ]);
+
+                console.log('[ActivityDetailPage] API Response status:', detailsRes.status);
+                if (detailsRes.ok) {
+                    const data = await detailsRes.json();
+                    console.log('[ActivityDetailPage] Received data:', {
+                        id: data.id,
+                        hasMap: !!data.map,
+                        hasStreams: !!data.streams,
+                        streamKeys: data.streams ? Object.keys(data.streams) : [],
+                        calories: data.calories,
+                        zones: data.zones?.length || 0
+                    });
+                    setDetails(data);
+                } else {
+                    console.error('[ActivityDetailPage] API call failed:', detailsRes.status, await detailsRes.text());
+                }
+
+                // Load AI summary if available
+                if (summaryRes?.ok) {
+                    const summaryData = await summaryRes.json();
+                    if (summaryData.versions && summaryData.versions.length > 0) {
+                        const latest = summaryData.versions[summaryData.versions.length - 1];
+                        try {
+                            const parsed = JSON.parse(latest.text);
+                            setAiSummary(parsed);
+                        } catch (e) {
+                            setAiSummary({ summary: latest.text });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("[ActivityDetailPage] Failed to load activity details", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (activity?.id) {
+            fetchData();
+        } else {
+            console.warn('[ActivityDetailPage] No activity.id provided');
+            setLoading(false);
+        }
+    }, [activity]);
+
+    if (!activity) return null;
+
+    const isRun = activity.type === 'Run';
+    // Show map for any activity that has polyline data, not just runs
     const hasMap = !!(details?.map?.summary_polyline || details?.map?.polyline);
 
-    // --- Shared Components ---
+    // --- Data Formatting Helpers ---
 
-    const HRZoneGradient = ({ avgHeartRate, maxHeartRate = 200 }) => {
-        // Calculate position percentage (clamped 0-100)
-        // Assuming rest HR ~40, Max ~200 for generic scaling if max not provided
-        // Or strictly relative to typical zones: Z1(100)-Z5(180+)
-        const minHR = 60;
-        const maxHR = 200;
-        const percentage = Math.min(100, Math.max(0, ((avgHeartRate - minHR) / (maxHR - minHR)) * 100));
+    // Distance (Meters -> KM)
+    const distanceKm = (activity.distance / 1000).toFixed(2);
 
-        return (
-            <div className="space-y-2">
-                <div className="flex justify-between items-center mb-1">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Heart Rate Intensity</p>
-                    <p className="text-xs font-mono font-bold text-rose-400">{avgHeartRate} BPM Avg</p>
-                </div>
-                <div className="relative h-6 w-full rounded-full mt-2">
-                    {/* Gradient Bar */}
-                    <div className="absolute inset-0 rounded-full opacity-90"
-                        style={{
-                            background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 30%, #facc15 60%, #f97316 80%, #ef4444 100%)'
-                        }}
-                    ></div>
+    // Date
+    const dateObj = new Date(activity.start_date || activity.date); // Handle both formats
+    const dateStr = !isNaN(dateObj) ? dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Unknown Date';
 
-                    {/* Pointer */}
-                    <div
-                        className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10 transition-all duration-1000"
-                        style={{ left: `${percentage}%` }}
-                    >
-                        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"></div>
-                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-white"></div>
-                    </div>
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono pt-1">
-                    <span>Easy</span>
-                    <span>Mod</span>
-                    <span>Hard</span>
-                    <span>Max</span>
-                </div>
-            </div>
-        );
-    };
+    // Telemetry Data Preparation
+    const streams = details?.streams || {};
+    const hasHeartRate = !!streams.heartrate?.data;
+    const hasVelocity = !!streams.velocity_smooth?.data;
 
-    const AIInsightsSection = () => (
-        <div className="space-y-6">
-            {aiAnalysis ? (
-                <>
-                    <div className={`glass-card rounded-xl p-6 border-l-4 border-l-[#f97415] mb-6 flex flex-col transition-all duration-300 ${analyzing ? 'opacity-60' : 'opacity-100'}`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2 text-[#f97415]">
-                                <Flame className={`w-6 h-6 ${analyzing ? 'animate-pulse' : ''}`} />
-                                <h4 className="font-bold text-lg">{analyzing ? 'Regenerating Analysis...' : 'About this workout'}</h4>
-                            </div>
-                            <button
-                                onClick={async () => {
-                                    if (confirm('Regenerate AI summary?')) {
-                                        try {
-                                            await fetch(`/api/activities/${activity.id}/analysis`, {
-                                                method: 'DELETE',
-                                                credentials: 'include'
-                                            });
-                                            handleAnalyze();
-                                        } catch (err) {
-                                            console.error('Failed:', err);
-                                        }
-                                    }
-                                }}
-                                disabled={analyzing}
-                                className="p-2 hover:bg-[#f97415]/20 rounded-lg transition-colors text-[#f97415] disabled:cursor-not-allowed"
-                                title="Regenerate AI Summary"
-                            >
-                                <RotateCcw className={`w-5 h-5 ${analyzing ? 'animate-spin' : ''}`} />
-                            </button>
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line">
-                                {analyzing ? 'AI is analyzing your workout data using advanced metrics...' : (aiAnalysis.summary || 'Detailed performance analysis is available below.')}
-                            </p>
-                        </div>
-                    </div>
+    console.log('[ActivityDetailPage] Stream analysis:', {
+        streamKeys: Object.keys(streams),
+        heartrateStructure: streams.heartrate ? Object.keys(streams.heartrate) : 'missing',
+        velocityStructure: streams.velocity_smooth ? Object.keys(streams.velocity_smooth) : 'missing',
+        hasHeartRate,
+        hasVelocity,
+        heartrateDataLength: streams.heartrate?.data?.length,
+        velocityDataLength: streams.velocity_smooth?.data?.length
+    });
 
-                    {aiAnalysis.way_forward && (
-                        <div className="glass-card rounded-xl p-6 border-l-4 border-l-emerald-500 flex flex-col">
-                            <div className="flex items-center gap-2 text-emerald-500 mb-4">
-                                <TrendingUp className="w-6 h-6" />
-                                <h4 className="font-bold text-lg">Way Forward</h4>
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line">
-                                    {aiAnalysis.way_forward}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="glass-card rounded-xl p-6 text-center">
-                    <Flame className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                    <p className="text-slate-400 mb-4">Get AI-powered coaching insights</p>
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={analyzing || loadingDetails}
-                        className="bg-[#f97415] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#ea580c] transition-colors disabled:opacity-50 relative z-10 cursor-pointer"
-                    >
-                        {analyzing ? 'Analyzing...' : loadingDetails ? 'Loading Data...' : 'Analyze Activity'}
-                    </button>
-                </div>
-            )}
-        </div>
-    );
+    // Combine streams for chart with SMOOTHING
+    const rawHr = streams.heartrate?.data || [];
+    const rawVelocity = streams.velocity_smooth?.data || [];
 
-    // --- Non-Map Layout Components ---
+    // Apply rolling average for smoother curves (window of 20 points)
+    const smoothedHr = rollingAverage(rawHr, 20);
+    const smoothedVelocity = rollingAverage(rawVelocity, 20);
 
-    const NonMapStatsGrid = () => (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-white/10 rounded-xl overflow-hidden bg-slate-800/40 mb-8">
-            <div className="p-6 border-r border-b md:border-b-0 border-white/10 flex flex-col items-center text-center">
-                <Clock className="text-[#f97415] mb-2 w-6 h-6" />
-                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">Total Duration</p>
-                <p className="text-3xl font-bold font-mono text-white">{activity.duration}</p>
-            </div>
-            <div className="p-6 border-r border-b md:border-b-0 border-white/10 flex flex-col items-center text-center">
-                <Heart className="text-rose-500 mb-2 w-6 h-6 fill-current" />
-                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">Average HR</p>
-                <p className="text-3xl font-bold font-mono text-white">{activity.heartRate || '-'} <span className="text-sm font-normal text-slate-500">bpm</span></p>
-            </div>
-            <div className="p-6 border-r border-white/10 flex flex-col items-center text-center">
-                <Flame className="text-emerald-500 mb-2 w-6 h-6" />
-                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">Calories Burned</p>
-                <p className="text-3xl font-bold font-mono text-white">
-                    {details?.calories || activity.raw?.calories || (details?.kilojoules ? Math.round(details.kilojoules / 4.184) : '-')}
-                    <span className="text-sm font-normal text-slate-500 ml-1">kcal</span>
-                </p>
-            </div>
-            <div className="p-6 flex flex-col items-center text-center">
-                <Activity className="text-[#f97415] mb-2 w-6 h-6" />
-                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">Training Load</p>
-                <p className="text-3xl font-bold font-mono text-white">{activity.raw?.suffer_score || details?.suffer_score || '-'}</p>
-            </div>
-        </div>
-    );
+    // Convert velocity to pace and sample every Nth point for performance
+    const sampleRate = Math.max(1, Math.floor(rawHr.length / 200)); // Max 200 points
 
-    const HeartRateTelemetry = () => {
-        if (!details?.streams?.heartrate?.data) return null;
+    const chartData = (hasHeartRate || hasVelocity) ?
+        smoothedHr.map((_, i) => ({
+            i,
+            hr: smoothedHr[i],
+            pace: smoothedVelocity[i] ? (16.666 / (smoothedVelocity[i] || 0.1)) : null
+        })).filter((_, i) => i % sampleRate === 0) : null;
 
-        const data = details.streams.heartrate.data.map((hr, i) => ({
-            index: i,
-            hr: hr
-        }));
+    // Filter out crazy pace spikes for chart clarity (e.g. > 20 min/km which is walking/stopped)
+    const cleanChartData = chartData?.map(d => ({
+        ...d,
+        pace: d.pace && d.pace < 20 ? d.pace : null
+    }));
 
-        return (
-            <div className="glass-card rounded-xl p-6 border border-white/10 mb-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-white font-bold text-lg">Heart Rate Analysis</h3>
-                        <p className="text-xs text-slate-500">Highlighting intensity zones</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                        <span className="text-xs text-slate-400 font-mono uppercase">Heart Rate</span>
-                    </div>
-                </div>
-                <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data}>
-                            <defs>
-                                <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                                labelStyle={{ display: 'none' }}
-                                formatter={(value) => [`${value} BPM`, 'Heart Rate']}
-                            />
-                            <Area type="monotone" dataKey="hr" stroke="#f43f5e" fillOpacity={1} fill="url(#colorHr)" strokeWidth={2} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        );
-    };
+    console.log('[ActivityDetailPage] Chart data:', {
+        chartDataLength: chartData?.length,
+        cleanChartDataLength: cleanChartData?.length,
+        hasMap,
+        mapPolyline: !!details?.map?.polyline,
+        mapSummaryPolyline: !!details?.map?.summary_polyline
+    });
 
-    // --- Map Layout Components ---
+    // --- Mock Data Generators (replacing hardcoded values from HTML) ---
+    // If we have actual zones from API (details.zones), use them. Else mock.
+    const hrZonesSource = details?.zones?.[0]?.distribution_buckets || [];
+
+    const hrDistribution = hrZonesSource.length > 0 ? hrZonesSource.map((bucket, i) => ({
+        name: `Z${i + 1}`,
+        value: Math.round((bucket.time / activity.moving_time) * 100) || 0, // % of total time
+        color: ['#94a3b8', '#3b82f6', '#10b981', '#f97415', '#ef4444'][i] || '#94a3b8',
+        label: new Date(bucket.time * 1000).toISOString().substr(14, 5) // Format seconds to MM:SS
+    })).reverse() : [
+        // Fallback Mock
+        { name: 'Z5', value: 15, color: '#ef4444', label: '08:12' },
+        { name: 'Z4', value: 60, color: '#f97415', label: '32:45' },
+        { name: 'Z3', value: 20, color: '#10b981', label: '11:05' },
+        { name: 'Z2', value: 5, color: '#3b82f6', label: '02:30' },
+        { name: 'Z1', value: 0, color: '#94a3b8', label: '00:00' },
+    ];
 
     const HeroMap = ({ mapPolyline }) => {
-        if (!mapPolyline) return (
-            <div className="h-[400px] bg-slate-900 flex items-center justify-center">
-                <p className="text-slate-500">No map data available</p>
-            </div>
-        );
-
+        if (!mapPolyline) return <div className="h-48 bg-slate-800 w-full animate-pulse"></div>;
         const positions = polyline.decode(mapPolyline);
         const center = positions[Math.floor(positions.length / 2)];
 
         const Recenter = ({ positions }) => {
             const map = useMap();
-            useEffect(() => {
-                if (positions.length > 0) {
-                    map.fitBounds(positions);
-                }
-            }, [positions, map]);
+            useEffect(() => { if (positions.length) map.fitBounds(positions); }, [positions, map]);
             return null;
         };
 
         return (
-            <div className="h-[400px] w-full relative bg-slate-900">
-                <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-                    <TileLayer
-                        url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
-                        attribution='&copy; <a href="https://stadiamaps.com/">Stadia</a>'
-                    />
-                    <Polyline positions={positions} color="#f97415" weight={4} opacity={0.9} />
-                    <Recenter positions={positions} />
-                </MapContainer>
-
-                {/* Floating Metric Bar */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-4xl z-[1000]">
-                    <div className="glass-metric rounded-xl p-6 flex flex-wrap items-center justify-around gap-8 backdrop-blur-md bg-black/40 border border-white/10">
-                        <div className="flex flex-col items-center">
-                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Distance</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-white text-3xl font-bold font-mono">{activity.distance || 0}</span>
-                                <span className="text-slate-400 text-sm font-mono">km</span>
-                            </div>
-                        </div>
-                        <div className="w-px h-10 bg-white/10 hidden md:block"></div>
-                        <div className="flex flex-col items-center">
-                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Avg Pace</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-white text-3xl font-bold font-mono">{activity.pace || 'N/A'}</span>
-                                <span className="text-slate-400 text-sm font-mono">/km</span>
-                            </div>
-                        </div>
-                        <div className="w-px h-10 bg-white/10 hidden md:block"></div>
-                        <div className="flex flex-col items-center">
-                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Elevation</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-white text-3xl font-bold font-mono">{activity.elevation || 0}</span>
-                                <span className="text-slate-400 text-sm font-mono">m</span>
-                            </div>
-                        </div>
-                        <div className="w-px h-10 bg-white/10 hidden md:block"></div>
-                        <div className="flex flex-col items-center">
-                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Avg Heart Rate</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-[#f97415] text-3xl font-bold font-mono">{activity.heartRate || 'N/A'}</span>
-                                <span className="text-slate-400 text-sm font-mono">bpm</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <MapContainer center={center} zoom={13} style={{ height: '192px', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false} attributionControl={false}>
+                <TileLayer url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png" />
+                <Polyline positions={positions} color="#f97415" weight={3} opacity={0.9} />
+                <Recenter positions={positions} />
+            </MapContainer>
         );
     };
 
-    const CombinedChart = () => {
-        if (!details?.streams) return null;
+    const ActivityStat = ({ label, value, unit }) => (
+        <div className="flex flex-col">
+            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight truncate">{label}</p>
+            <p className="text-[14px] font-bold font-mono text-white tracking-tight">
+                {value}<span className="text-[10px] ml-0.5 opacity-50 font-normal">{unit}</span>
+            </p>
+        </div>
+    );
 
-        const chartData = details.streams.distance?.data?.map((dist, idx) => ({
-            distance: (dist / 1000).toFixed(1),
-            pace: details.streams.velocity_smooth?.data?.[idx]
-                ? (1000 / (details.streams.velocity_smooth.data[idx] * 60)).toFixed(2)
-                : null,
-            heartRate: details.streams.heartrate?.data?.[idx] || null,
-        })) || [];
-
-        return (
-            <div className="glass-card rounded-xl p-6 mb-8">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-white font-bold text-lg">Performance Telemetry</h3>
-                    <div className="flex gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <span className="text-xs text-slate-400 font-mono">PACE</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                            <span className="text-xs text-slate-400 font-mono">HEART RATE</span>
-                        </div>
-                    </div>
-                </div>
-                <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="distance" stroke="#94a3b8" style={{ fontSize: '12px' }} />
-                        <YAxis yAxisId="left" stroke="#10b981" style={{ fontSize: '12px' }} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#f43f5e" style={{ fontSize: '12px' }} />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                            labelStyle={{ color: '#94a3b8' }}
-                        />
-                        <Line yAxisId="left" type="monotone" dataKey="pace" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                        <Line yAxisId="right" type="monotone" dataKey="heartRate" stroke="#f43f5e" strokeWidth={2.5} dot={false} />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-        );
-    };
-
-    const PerKmTable = () => {
-        if (!details?.laps || details.laps.length === 0) return null;
-
-        return (
-            <div className="glass-card rounded-xl overflow-hidden mb-8">
-                <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center">
-                    <h3 className="text-white font-bold">Kilometer Breakdown</h3>
-                    <span className="text-slate-400 text-sm">{details.laps.length} km</span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-sm">
-                        <thead className="bg-slate-800/50 text-slate-500">
-                            <tr>
-                                <th className="px-6 py-3 font-medium">KM</th>
-                                <th className="px-6 py-3 font-medium">Time</th>
-                                <th className="px-6 py-3 font-medium">Pace</th>
-                                <th className="px-6 py-3 font-medium">Avg HR</th>
-                                <th className="px-6 py-3 font-medium">Elev. Gain</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {details.laps.map((lap, idx) => {
-                                const paceSeconds = lap.moving_time / (lap.distance / 1000);
-                                const paceMin = Math.floor(paceSeconds / 60);
-                                const paceSec = Math.floor(paceSeconds % 60);
-                                const pace = `${paceMin}:${paceSec.toString().padStart(2, '0')}`;
-
-                                // Calculate pace for all laps to identify fastest
-                                const allPaces = details.laps.map(l => l.moving_time / (l.distance / 1000));
-                                const minPace = Math.min(...allPaces);
-                                const isFastest = Math.abs(paceSeconds - minPace) < 0.1; // Float comparison toggle
-
-                                return (
-                                    <tr
-                                        key={idx}
-                                        className={`hover:bg-slate-800/30 transition-colors ${isFastest ? 'bg-[#f97415]/5' : ''}`}
-                                    >
-                                        <td className="px-6 py-4 text-slate-300">
-                                            {idx + 1}
-                                            {isFastest && <span className="ml-2 text-[10px] text-[#f97415] uppercase font-bold">Fastest</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-white">{Math.floor(lap.moving_time / 60)}:{(lap.moving_time % 60).toString().padStart(2, '0')}</td>
-                                        <td className={`px-6 py-4 ${isFastest ? 'text-[#f97415] font-bold' : 'text-white'}`}>{pace} /km</td>
-                                        <td className="px-6 py-4 text-emerald-400">{lap.average_heartrate ? Math.round(lap.average_heartrate) : 'N/A'} bpm</td>
-                                        <td className="px-6 py-4 text-slate-400">{Math.round(lap.total_elevation_gain || 0)}m</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
+    // Formatting Helpers
+    const formatDuration = (seconds) => {
+        if (!seconds) return activity.duration || '--:--'; // Fallback to formatted string if exists
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h > 0 ? `${h}:${m.toString().padStart(2, '0')}` : `${m}:${(seconds % 60).toString().padStart(2, '0')}`;
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] text-slate-100">
-            {hasMap ? (
-                // --- MAP VIEW ---
-                <>
-                    <HeroMap mapPolyline={details?.map?.summary_polyline || details?.map?.polyline} />
+        <div className="h-full flex flex-col bg-[#0f172a] text-white overflow-hidden relative font-display">
 
-                    <main className="max-w-[1200px] mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 space-y-8">
-                            {/* Header */}
-                            <div className="space-y-1">
-                                <button
-                                    onClick={onBack}
-                                    className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4"
-                                >
-                                    <ArrowLeft className="w-4 h-4" />
-                                    <span className="text-sm font-medium">Back to Activities</span>
-                                </button>
-                                <h1 className="text-4xl font-bold text-white flex items-center gap-3 flex-wrap">
-                                    {activity.raw?.name || activity.type}
-                                    {aiAnalysis?.intensity_label && (
-                                        <span className={`text-xs px-2 py-1 rounded font-mono border ${['Intense', 'Max Effort', 'Long Run', 'High', 'Very', 'Anaerobic'].some(l => aiAnalysis.intensity_label.includes(l))
-                                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                                : ['Recovery', 'Easy'].some(l => aiAnalysis.intensity_label.includes(l))
-                                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                                    : 'bg-[#f97415]/10 text-[#f97415] border-[#f97415]/20'
-                                            }`}>
-                                            {aiAnalysis.intensity_label}
-                                        </span>
-                                    )}
-                                </h1>
-                                <p className="text-slate-400 text-sm flex items-center gap-2">
-                                    <Calendar className="w-4 h-4" />
-                                    {activity.date}
-                                </p>
-                            </div>
-
-                            <CombinedChart />
-
-                            {/* Secondary Metrics Grid for Runs */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div className="glass-card p-4 rounded-xl">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Distance</p>
-                                    <p className="text-2xl font-bold font-mono text-white">{activity.distance} <span className="text-sm font-normal text-slate-500">km</span></p>
-                                </div>
-                                <div className="glass-card p-4 rounded-xl">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Duration</p>
-                                    <p className="text-2xl font-bold font-mono text-white">{activity.duration}</p>
-                                </div>
-                                <div className="glass-card p-4 rounded-xl">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Avg Pace</p>
-                                    <p className="text-2xl font-bold font-mono text-white">{activity.pace} <span className="text-sm font-normal text-slate-500">/km</span></p>
-                                </div>
-                            </div>
-
-                            <PerKmTable />
+            {/* Header */}
+            <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <button onClick={onClose} className="p-1 -ml-2 text-slate-400 hover:text-white transition-colors">
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="text-primary">
+                            {isRun ? <Zap className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
                         </div>
-
-                        {/* Right Sidebar */}
-                        <div className="space-y-6">
-                            <AIInsightsSection />
-
-                            {/* HR Gradient for Map View */}
-                            <div className="glass-card rounded-xl p-6">
-                                <HRZoneGradient avgHeartRate={activity.heartRate} />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="glass-card p-4 rounded-xl text-center">
-                                    <Clock className="w-5 h-5 text-[#f97415] mx-auto mb-1" />
-                                    <p className="text-slate-500 text-[10px] uppercase font-bold">Moving Time</p>
-                                    <p className="text-lg font-bold font-mono text-white">{activity.duration}</p>
-                                </div>
-                                <div className="glass-card p-4 rounded-xl text-center">
-                                    <TrendingUp className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-                                    <p className="text-slate-500 text-[10px] uppercase font-bold">Elevation</p>
-                                    <p className="text-lg font-bold font-mono text-white">{activity.elevation}m</p>
-                                </div>
-                            </div>
-                        </div>
-                    </main>
-                </>
-            ) : (
-                // --- NON-MAP VIEW (Universal Data Report) ---
-                <div className="pt-8 w-full max-w-[1400px] mx-auto">
-                    {/* Non-Map Header */}
-                    <div className="px-6 mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                        <div className="space-y-2">
-                            <button
-                                onClick={onBack}
-                                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                <span className="text-sm font-medium">Back to Activities</span>
-                            </button>
-                            <div className="flex items-center gap-2 text-xs font-bold text-[#f97415] uppercase tracking-widest">
-                                <Activity className="w-4 h-4" />
-                                <span>{activity.type} Session</span>
-                            </div>
-                            <h1 className="text-white text-4xl font-bold leading-tight flex items-center gap-3 flex-wrap">
-                                {activity.raw?.name || activity.type}
-                                {aiAnalysis?.intensity_label && (
-                                    <span className={`text-xs px-2 py-1 rounded font-mono border align-middle ${['Intense', 'Max Effort', 'Long Run', 'High', 'Very', 'Anaerobic'].some(l => aiAnalysis.intensity_label.includes(l))
-                                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                        : ['Recovery', 'Easy'].some(l => aiAnalysis.intensity_label.includes(l))
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                            : 'bg-[#f97415]/10 text-[#f97415] border-[#f97415]/20'
-                                        }`}>
-                                        {aiAnalysis.intensity_label}
-                                    </span>
-                                )}
-                            </h1>
-                            <p className="text-slate-400 text-sm font-normal flex items-center gap-2">
-                                <Calendar className="w-4 h-4" />
-                                {activity.date}
+                        <div>
+                            <h1 className="text-sm font-bold tracking-tight uppercase text-white/90">{activity.name}</h1>
+                            <p className="text-[10px] text-white/50 font-mono uppercase">
+                                {dateStr} • {distanceKm} KM
                             </p>
                         </div>
                     </div>
+                </div>
+                <div className="flex gap-2">
+                    <button className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 hover:text-primary transition-colors text-slate-400">
+                        <Share className="w-4 h-4" />
+                    </button>
+                    <button className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 hover:text-primary transition-colors text-slate-400">
+                        <MoreVertical className="w-4 h-4" />
+                    </button>
+                </div>
+            </header>
 
-                    <div className="px-6">
-                        <NonMapStatsGrid />
-                    </div>
+            <main className="flex-1 overflow-y-auto hide-scrollbar pb-24 bg-[#0f172a]">
 
-                    <main className="px-6 py-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
-                        <div className="lg:col-span-3 space-y-8">
-                            <HeartRateTelemetry />
-
-                            {/* Detailed Activity Log (Placeholder table if no laps/sets data) */}
-                            {details?.laps && details.laps.length > 0 && (
-                                <div className="glass-card rounded-xl overflow-hidden">
-                                    <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2">
-                                        <Monitor className="text-slate-400 w-5 h-5" />
-                                        <h3 className="text-white font-bold">Detailed Activity Log</h3>
-                                    </div>
-                                    <table className="w-full text-left font-mono text-sm">
-                                        <thead className="bg-slate-800/50 text-slate-500">
-                                            <tr>
-                                                <th className="px-6 py-3 font-medium uppercase text-[10px] tracking-wider">Interval</th>
-                                                <th className="px-6 py-3 font-medium uppercase text-[10px] tracking-wider">Time</th>
-                                                <th className="px-6 py-3 font-medium uppercase text-[10px] tracking-wider">Avg HR</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {details.laps.map((lap, i) => (
-                                                <tr key={i} className="hover:bg-slate-800/30">
-                                                    <td className="px-6 py-4 text-slate-300">Set/Lap {i + 1}</td>
-                                                    <td className="px-6 py-4 text-white">{Math.floor(lap.moving_time / 60)}:{(lap.moving_time % 60).toString().padStart(2, '0')}</td>
-                                                    <td className="px-6 py-4 text-rose-400">{Math.round(lap.average_heartrate || 0)} bpm</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                {/* Hero */}
+                <div className="relative h-48 w-full bg-slate-900 border-b border-white/5">
+                    {hasMap ? (
+                        <div className="absolute inset-0 opacity-80 mix-blend-luminosity hover:mix-blend-normal transition-all duration-700">
+                            <HeroMap mapPolyline={details?.map?.summary_polyline || details?.map?.polyline} />
                         </div>
+                    ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#1a2035] to-slate-900 flex flex-col items-center justify-center">
+                            <Activity className="w-16 h-16 text-white/10" />
+                            <p className="text-xs font-bold uppercase tracking-widest text-white/20 mt-4">{activity.type} Details</p>
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent pointer-events-none"></div>
+                </div>
 
-                        {/* Right Sidebar */}
-                        <div className="space-y-6">
-                            <div className="glass-card rounded-xl p-6">
-                                <h3 className="text-white font-bold text-lg mb-6">Heart Rate Distribution</h3>
-                                <HRZoneGradient avgHeartRate={activity.heartRate} />
+                {/* Stats Grid - "The Frosted Card" */}
+                {/* NOTE: Negative margin pulls it up over the Hero as requested */}
+                <div className="px-4 -mt-12 relative z-10">
+                    <div className="glass-card rounded-xl p-5 grid grid-cols-4 gap-y-6 gap-x-2 border border-white/10 shadow-2xl bg-[#0f172a]/80 backdrop-blur-xl">
+
+                        {/* Row 1 */}
+                        {/* Prefer detail values which are raw seconds usually, mapped to formatted strings */}
+                        <ActivityStat label="Time" value={formatDuration(details?.moving_time)} unit="" />
+                        <ActivityStat label="Suffer" value={details?.suffer_score || '-'} unit="" />
+
+                        {isRun ? (
+                            <>
+                                <ActivityStat label="Elev." value={details?.total_elevation_gain || 0} unit="M" />
+                                <ActivityStat label="Cadence" value={details?.average_cadence ? Math.round(details.average_cadence * 2) : '--'} unit="" />
+                                {/* Strava sends cadence as steps/min for running usually on 'Run' type? Wait, avg_cadence is usually steps/min * 2 or just steps/min. Strava API 'average_cadence' for run is usually one-foot? No usually full. Let's assume raw is ok, unless user sees half values. */}
+                            </>
+                        ) : (
+                            <>
+                                <ActivityStat label="Avg HR" value={Math.round(details?.average_heartrate) || '--'} unit="BPM" />
+                                <ActivityStat label="Cal." value={details?.calories || '--'} unit="" />
+                            </>
+                        )}
+
+                        {/* Row 2 (Run Only mostly) */}
+                        {isRun && (
+                            <>
+                                <ActivityStat label="Max HR" value={Math.round(details?.max_heartrate) || '--'} unit="" />
+                                <ActivityStat label="Cal." value={details?.calories || '--'} unit="" />
+                                <ActivityStat label="Grade" value="0.0" unit="%" />
+                                <ActivityStat label="Temp." value="-" unit="°C" />
+                            </>
+                        )}
+                        {/* Fillers for non-run layout logic if needed, but 4 columns wraps automatically */}
+                    </div>
+                </div>
+
+                {/* Sub Navigation */}
+                <div className="px-4 mt-8">
+                    <div className="flex border-b border-white/10 gap-6">
+                        {['analysis', 'splits', 'segments'].map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`pb-3 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Tab Content */}
+                <div className="px-4 py-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+
+                    {activeTab === 'analysis' && (
+                        <>
+                            {/* Performance Telemetry */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-xs font-bold text-white/90 uppercase tracking-tight">Performance Telemetry</h3>
+                                        {isRun && (
+                                            <div className="flex gap-3 mt-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-2 h-2 rounded-full bg-primary"></div>
+                                                    <span className="text-[10px] text-white/50 font-mono uppercase tracking-tight">Pace</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                                                    <span className="text-[10px] text-white/50 font-mono uppercase tracking-tight">HR {Math.round(details?.average_heartrate || 0)} BPM</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button className="text-white/20 hover:text-white transition-colors">
+                                        <MoreVertical className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {cleanChartData && cleanChartData.length > 0 ? (
+                                    <div className="h-48 w-full relative">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart data={cleanChartData}>
+                                                <defs>
+                                                    <linearGradient id="hrFill" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
+                                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <YAxis yAxisId="left" hide domain={['dataMin', 'dataMax']} reversed /> {/* Pace */}
+                                                <YAxis yAxisId="right" hide domain={['dataMin', 'dataMax']} /> {/* HR */}
+
+                                                {/* Dashed Grid Lines (Manual via Reference Lines or just styled Container) */}
+                                                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+
+                                                <Area yAxisId="right" type="monotone" dataKey="hr" stroke="#f43f5e" strokeWidth={2} fill="url(#hrFill)" />
+                                                <Line yAxisId="left" type="monotone" dataKey="pace" stroke="#f97415" strokeWidth={2} dot={false} />
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+
+                                        {/* Axis Labels Bottom */}
+                                        <div className="flex justify-between mt-2 px-1">
+                                            <span className="text-[9px] text-white/30 font-mono">0.0 KM</span>
+                                            <span className="text-[9px] text-white/30 font-mono">{(distanceKm / 2).toFixed(1)} KM</span>
+                                            <span className="text-[9px] text-white/30 font-mono">{distanceKm} KM</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-32 flex items-center justify-center border border-dashed border-white/10 rounded-xl text-xs text-white/30">
+                                        No telemetry data available
+                                    </div>
+                                )}
                             </div>
 
-                            <AIInsightsSection />
+                            {/* Heart Rate Zones */}
+                            {hrDistribution.some(z => z.value > 0) && (
+                                <div className="pt-2">
+                                    <h3 className="text-xs font-bold text-white/90 uppercase tracking-widest mb-4">Heart Rate Zones</h3>
+                                    <div className="space-y-4">
+                                        {hrDistribution.map((zone) => (
+                                            <div key={zone.name} className="flex items-center gap-3 group">
+                                                <span className="w-8 text-[10px] font-mono text-white/40 group-hover:text-white transition-colors">{zone.name}</span>
+                                                <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden flex">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-1000 ease-out"
+                                                        style={{ width: `${zone.value}%`, backgroundColor: zone.color }}
+                                                    ></div>
+                                                </div>
+                                                <span className="w-12 text-[10px] font-mono text-right text-white/60 group-hover:text-white transition-colors">{zone.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
+                            {/* AI Coach Analysis */}
+                            {aiSummary ? (
+                                <div className="space-y-4 pt-4">
+                                    {/* Run Type & Effort Badge */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {aiSummary.runType && (
+                                            <span className="px-3 py-1 bg-indigo-500/20 rounded-full text-[11px] font-bold text-indigo-300 uppercase">
+                                                {aiSummary.runType}
+                                            </span>
+                                        )}
+                                        {aiSummary.relativeEffort && (
+                                            <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase ${aiSummary.relativeEffort.toLowerCase() === 'low'
+                                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                                    : aiSummary.relativeEffort.toLowerCase() === 'moderate'
+                                                        ? 'bg-yellow-500/20 text-yellow-400'
+                                                        : 'bg-red-500/20 text-red-400'
+                                                }`}>
+                                                {aiSummary.relativeEffort} Effort
+                                            </span>
+                                        )}
+                                    </div>
 
+                                    {/* About This Workout - Shows highlight */}
+                                    <div className="glass-card p-4 rounded-xl border border-indigo-500/20 bg-gradient-to-br from-indigo-900/30 to-slate-900/30">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                                                <Sparkles className="w-3 h-3 text-indigo-400" />
+                                            </div>
+                                            <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest">About This Workout</h3>
+                                        </div>
+                                        <p className="text-sm text-white/80 leading-relaxed">
+                                            {aiSummary.highlight || aiSummary.summary || 'AI analysis available.'}
+                                        </p>
+                                    </div>
+
+                                    {/* Way Forward - Shows suggestion */}
+                                    {aiSummary.suggestion && (
+                                        <div className="glass-card p-4 rounded-xl border border-primary/20 bg-gradient-to-br from-orange-900/20 to-slate-900/30">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                                                    <TrendingUp className="w-3 h-3 text-primary" />
+                                                </div>
+                                                <h3 className="text-xs font-bold text-primary uppercase tracking-widest">Way Forward</h3>
+                                            </div>
+                                            <p className="text-sm text-white/80 leading-relaxed italic">
+                                                "{aiSummary.suggestion}"
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="pt-4">
+                                    <button
+                                        onClick={async () => {
+                                            setAiLoading(true);
+                                            try {
+                                                const res = await fetch(`/api/activities/${activity.id}/analysis`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    credentials: 'include',
+                                                    body: JSON.stringify({ activityData: details })
+                                                });
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    if (data.versions?.length > 0) {
+                                                        const latest = data.versions[data.versions.length - 1];
+                                                        try {
+                                                            setAiSummary(JSON.parse(latest.text));
+                                                        } catch {
+                                                            setAiSummary({ summary: latest.text });
+                                                        }
+                                                    }
+                                                }
+                                            } catch (err) {
+                                                console.error('Failed to generate AI analysis:', err);
+                                            } finally {
+                                                setAiLoading(false);
+                                            }
+                                        }}
+                                        disabled={aiLoading}
+                                        className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
+                                    >
+                                        {aiLoading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Generating Analysis...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4" />
+                                                Generate AI Analysis
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {activeTab === 'splits' && (
+                        <div className="text-center py-10">
+                            <Timer className="w-8 h-8 text-white/20 mx-auto mb-3" />
+                            <p className="text-xs text-white/40">Lap splits data coming soon.</p>
                         </div>
-                    </main>
+                    )}
+
+                    {activeTab === 'segments' && (
+                        <div className="text-center py-10">
+                            <Mountain className="w-8 h-8 text-white/20 mx-auto mb-3" />
+                            <p className="text-xs text-white/40">Segment analysis coming soon.</p>
+                        </div>
+                    )}
+
                 </div>
-            )}
+            </main>
+
+            {/* Bottom Floating Action Bar (Optional, mimicking HTML Footer if needed, else empty) */}
+            <footer className="absolute bottom-6 left-4 right-4 z-50">
+                {/*  Replicating HTML Footer Actions */}
+                <div className="flex gap-3">
+                    <button className="flex-1 h-12 rounded-xl bg-primary text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-orange-600 transition-colors active:scale-95">
+                        <TrendingUp className="w-4 h-4" />
+                        Lap Splits
+                    </button>
+                    <button className="w-12 h-12 rounded-xl glass-card hover:bg-white/10 transition-colors flex items-center justify-center text-white/80 active:scale-95">
+                        <Activity className="w-5 h-5" />
+                    </button>
+                </div>
+            </footer>
+
         </div>
     );
 };

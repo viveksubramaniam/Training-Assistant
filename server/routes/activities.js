@@ -35,6 +35,8 @@ router.post('/sync', requireAuth, async (req, res) => {
     }
 
     const { fullSync } = req.body;
+    console.log(`[DEBUG] Sync Request Body:`, req.body);
+    console.log(`[DEBUG] Sync Request Headers:`, req.headers['user-agent']);
     console.log(`Starting sync for user ${user.name}. Full Sync: ${fullSync}`);
 
     let page = 1;
@@ -118,9 +120,34 @@ router.get('/:id', requireAuth, async (req, res) => {
     // Check if we have detailed data in cache
     const cachedActivity = await db.getActivity(userId, activityId);
 
-    if (cachedActivity && cachedActivity.hasDetailedData) {
+    console.log('[DEBUG] Cached Activity:', {
+        id: cachedActivity?.id,
+        hasDetailedData: cachedActivity?.hasDetailedData,
+        hasMap: !!cachedActivity?.map,
+        mapPolyline: !!cachedActivity?.map?.polyline,
+        mapSummaryPolyline: !!cachedActivity?.map?.summary_polyline,
+        hasStreams: !!cachedActivity?.streams,
+        streamKeys: cachedActivity?.streams ? Object.keys(cachedActivity.streams) : [],
+        hasHR: !!cachedActivity?.streams?.heartrate,
+        hasVelocity: !!cachedActivity?.streams?.velocity_smooth,
+        calories: cachedActivity?.calories
+    });
+
+    // Validate cached data integrity
+    const isCacheValid = cachedActivity &&
+        cachedActivity.hasDetailedData &&
+        cachedActivity.map &&
+        (cachedActivity.map.polyline || cachedActivity.map.summary_polyline) &&
+        cachedActivity.streams &&
+        (cachedActivity.streams.heartrate || cachedActivity.streams.velocity_smooth);
+
+    if (isCacheValid) {
         console.log(`Returning cached detailed data for activity ${activityId}`);
         return res.json(cachedActivity);
+    }
+
+    if (cachedActivity && cachedActivity.hasDetailedData && !isCacheValid) {
+        console.log(`Cached data for activity ${activityId} is incomplete/corrupted. Forcing re-fetch.`);
     }
 
     // Not in cache or not detailed - fetch from Strava
@@ -137,16 +164,37 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     try {
         // Fetch detailed activity, zones, and streams from Strava
+        // Request ALL available stream types for complete telemetry data
+        const streamKeys = [
+            'time',
+            'distance',
+            'latlng',
+            'altitude',
+            'velocity_smooth',
+            'heartrate',
+            'cadence',
+            'watts',
+            'temp',
+            'moving',
+            'grade_smooth'
+        ].join(',');
+
         const [activityRes, zonesRes, streamsRes] = await Promise.all([
             axios.get(`https://www.strava.com/api/v3/activities/${activityId}`, {
                 headers: { Authorization: `Bearer ${user.accessToken}` }
             }),
             axios.get(`https://www.strava.com/api/v3/activities/${activityId}/zones`, {
                 headers: { Authorization: `Bearer ${user.accessToken}` }
-            }).catch(err => ({ data: [] })), // Handle zones not found gracefully
-            axios.get(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=time,heartrate,velocity_smooth&key_by_type=true`, {
+            }).catch(err => {
+                console.log(`[API] Zones not available for ${activityId}:`, err.response?.data || err.message);
+                return { data: [] };
+            }),
+            axios.get(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=${streamKeys}&key_by_type=true`, {
                 headers: { Authorization: `Bearer ${user.accessToken}` }
-            }).catch(err => ({ data: {} })) // Handle streams error gracefully
+            }).catch(err => {
+                console.log(`[API] Streams not available for ${activityId}:`, err.response?.data || err.message);
+                return { data: {} };
+            })
         ]);
 
         const detailedActivity = {
@@ -155,6 +203,10 @@ router.get('/:id', requireAuth, async (req, res) => {
             streams: streamsRes.data,
             hasDetailedData: true  // Mark as having detailed data
         };
+
+
+
+        console.log(`[API] Detailed Activity Fetched. ID: ${detailedActivity.id}. Map:`, !!detailedActivity.map, 'Stream Keys:', Object.keys(detailedActivity.streams || {}));
 
         // Save to database cache
         await db.updateActivity(userId, activityId, detailedActivity);

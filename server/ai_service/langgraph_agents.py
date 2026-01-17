@@ -62,15 +62,23 @@ OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def call_llm(prompt: str, system: str = "You are an expert running coach.") -> str:
-    """Call the LLM endpoint via OpenRouter."""
+    """Call the LLM endpoint (OpenRouter or Local)."""
     try:
-        headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        if OPENAI_API_KEY:
+            # Use OpenRouter
+            endpoint = OPENROUTER_ENDPOINT
+            headers = {
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json"
+            }
+        else:
+            # Use Local LLM (e.g. LM Studio)
+            endpoint = LLM_ENDPOINT
+            headers = {"Content-Type": "application/json"}
+            print(f"[LLM] Using local endpoint: {endpoint}")
         
         response = requests.post(
-            OPENROUTER_ENDPOINT,
+            endpoint,
             headers=headers,
             json={
                 "model": MODEL_NAME,
@@ -134,6 +142,12 @@ def orchestrator_node(state: PlanState) -> PlanState:
         else:
             current_training_load = "low - still early in the week"
     
+    # Deterministic Overrides (Save LLM calls)
+    if has_goal and not has_master_plan:
+        print("[Orchestrator] No master plan found -> forcing master_planning_agent")
+        state["next_agent"] = "master_planning_agent"
+        return state
+
     prompt = f"""You are an AI orchestrator for a running coach application.
 Analyze the current state and decide which action to take.
 
@@ -288,45 +302,59 @@ Respond with ONLY valid JSON, dont enter newlines or extra spaces:
   "taper_start_week": {max(1, total_weeks - 1)}
 }}"""
 
-    # TEMPORARILY DISABLED: LLM keeps generating invalid JSON
-    # Using programmatic fallback instead
-    print("[Master Planning Agent] Using programmatic plan generation")
-    
-    # Fallback: Generate a basic periodized plan
-    weeks = []
-    for i in range(1, total_weeks + 1):
-            if i <= 4:
-                theme = "Base Building"
-                focus = "Aerobic foundation"
-                target_km = 30 + (i * 2)
-            elif i <= 8:
-                theme = "Build Phase"
-                focus = "Add intensity"
-                target_km = 40 + ((i - 4) * 3)
-            elif i <= total_weeks - 2:
-                theme = "Peak Phase"
-                focus = "Race-specific"
-                target_km = 50 + ((i - 8) * 2)
-            else:
-                theme = "Taper"
-                focus = "Recovery and sharpening"
-                target_km = 30 - ((total_weeks - i) * 5)
+    try:
+        response = call_llm(prompt)
+        
+        # Parse JSON from response
+        import re
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            master_plan = json.loads(json_match.group())
+            state["master_plan"] = master_plan
+            state["is_master_plan_ready"] = True
+            print("[Master Planning Agent] Master plan generated via LLM")
+        else:
+            raise ValueError("No JSON found in response")
             
-            weeks.append({
-                "week": i,
-                "theme": theme,
-                "focus": focus,
-                "targetKm": max(20, target_km),
-                "keyWorkouts": ["Long run", "Tempo", "Easy runs"]
-            })
-    
-    state["master_plan"] = {
-        "weeks": weeks,
-        "total_weeks": total_weeks,
-        "peak_week": max(1, total_weeks - 3),
-        "taper_start_week": max(1, total_weeks - 1)
-        }
-    state["is_master_plan_ready"] = True
+    except Exception as e:
+        print(f"[Master Planning Agent] LLM generation failed: {e}")
+        print("[Master Planning Agent] Using programmatic fallback")
+        
+        # Fallback: Generate a basic periodized plan
+        weeks = []
+        for i in range(1, total_weeks + 1):
+                if i <= 4:
+                    theme = "Base Building"
+                    focus = "Aerobic foundation"
+                    target_km = 30 + (i * 2)
+                elif i <= 8:
+                    theme = "Build Phase"
+                    focus = "Add intensity"
+                    target_km = 40 + ((i - 4) * 3)
+                elif i <= total_weeks - 2:
+                    theme = "Peak Phase"
+                    focus = "Race-specific"
+                    target_km = 50 + ((i - 8) * 2)
+                else:
+                    theme = "Taper"
+                    focus = "Recovery and sharpening"
+                    target_km = 30 - ((total_weeks - i) * 5)
+                
+                weeks.append({
+                    "week": i,
+                    "theme": theme,
+                    "focus": focus,
+                    "targetKm": max(20, target_km),
+                    "keyWorkouts": ["Long run", "Tempo", "Easy runs"]
+                })
+        
+        state["master_plan"] = {
+            "weeks": weeks,
+            "total_weeks": total_weeks,
+            "peak_week": max(1, total_weeks - 3),
+            "taper_start_week": max(1, total_weeks - 1)
+            }
+        state["is_master_plan_ready"] = True
     
     return state
 
@@ -422,9 +450,8 @@ Respond with ONLY valid JSON:
   "weekTheme": "{week_theme}",
   "weekFocus": "{week_focus}",
   "days": [
-    {{"date": "YYYY-MM-DD", "dayName": "Monday", "title": "...", "workout_type": "Easy Run|Interval|Long Run|Tempo|Rest", "target_time": "45 mins", "target_pace": "5:30 /km", "distance": 8, "intensity": 1, "description": "..."}}
+    {{"date": "YYYY-MM-DD", "dayName": "Monday", "title": "...", "workout_type": "Easy Run|Interval|Long Run|Tempo|Rest", "target_time": "{what you see fit}", "target_pace": "{what you see fit}", "distance": {what you see fit}, "intensity": 1 (easy)|2 (moderate)|3 (intense), "description": "..."}}
   ],
-  "totalDistance": 45,
   "restDays": 2
 }}"""
 
@@ -640,6 +667,7 @@ Respond with ONLY valid JSON:
 def prepare_result(state: PlanState) -> PlanState:
     """Prepare the final result for API response."""
     state["result"] = {
+        "masterPlan": state.get("master_plan"),
         "weeklyPlan": state.get("weekly_plan"),
         "dailyPlan": state.get("daily_plan"),
         "todayWorkout": state["daily_plan"].get("fromWeeklyPlan") if state.get("daily_plan") else None,
