@@ -31,33 +31,15 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
         );
     };
 
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            const method = existingGoal?.id ? 'PUT' : 'POST';
-            const url = existingGoal?.id ? `/api/goals/${existingGoal.id}` : '/api/goals';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    goalType,
-                    targetDate: targetDate || null,
-                    weeklyTarget,
-                    preferredDays
-                })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                onSave(data);
-                onClose();
-            }
-        } catch (err) {
-            console.error('Failed to save goal:', err);
-        }
-        setSaving(false);
+    const handleSave = () => {
+        // Pass data to parent immediately
+        onSave({
+            goalType,
+            targetDate: targetDate || null,
+            weeklyTarget,
+            preferredDays
+        });
+        onClose();
     };
 
     if (!isOpen) return null;
@@ -106,8 +88,8 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                                     key={type}
                                     onClick={() => setGoalType(type)}
                                     className={`py-3 px-4 rounded-xl text-sm font-semibold transition-all ${goalType === type
-                                            ? 'bg-[#f97415] text-white'
-                                            : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+                                        ? 'bg-[#f97415] text-white'
+                                        : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
                                         }`}
                                 >
                                     {type}
@@ -157,8 +139,8 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                                     key={day}
                                     onClick={() => toggleDay(day)}
                                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${preferredDays.includes(day)
-                                            ? 'bg-[#f97415] text-white'
-                                            : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'
+                                        ? 'bg-[#f97415] text-white'
+                                        : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'
                                         }`}
                                 >
                                     {day.charAt(0)}

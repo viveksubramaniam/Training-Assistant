@@ -131,8 +131,106 @@ export const saveEmbedding = adapter.saveEmbedding;
 export const searchSimilarActivities = adapter.searchSimilarActivities;
 
 /* ========================================================================== */
-/*                         UTILITY EXPORTS                                    */
+/*                             GOAL OPERATIONS                                */
 /* ========================================================================== */
+
+/**
+ * Get active goal for a user
+ * @param {string} userId - User ID
+ * @returns {Promise<Object|null>} Goal object or null
+ */
+export const getActiveGoal = adapter.getActiveGoal;
+
+/**
+ * Get goal by ID
+ * @param {string} goalId - Goal ID
+ * @returns {Promise<Object|null>} Goal object or null
+ */
+export const getGoalById = adapter.getGoalById;
+
+/**
+ * Create a new goal
+ * @param {string} userId - User ID
+ * @param {Object} goalData - Goal data
+ * @returns {Promise<Object>} Created goal
+ */
+export const createGoal = adapter.createGoal;
+
+/**
+ * Update an existing goal
+ * @param {string} goalId - Goal ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object|null>} Updated goal or null
+ */
+export const updateGoal = adapter.updateGoal;
+
+/**
+ * Deactivate all goals for a user
+ * @param {string} userId - User ID
+ * @returns {Promise<void>}
+ */
+export const deactivateUserGoals = adapter.deactivateUserGoals;
+
+/**
+ * Delete a goal
+ * @param {string} goalId - Goal ID
+ * @returns {Promise<boolean>} True if deleted
+ */
+export const deleteGoal = adapter.deleteGoal;
+
+/**
+ * Get master plan for a goal
+ * @param {string} goalId - Goal ID
+ * @returns {Promise<Object|null>} Master plan or null
+ */
+export const getMasterPlan = adapter.getMasterPlan;
+
+/**
+ * Save master plan for a goal
+ * @param {string} goalId - Goal ID
+ * @param {Object} planData - Plan data from AI
+ * @returns {Promise<Object>} Saved plan
+ */
+export const saveMasterPlan = adapter.saveMasterPlan;
+
+/**
+ * Get activity summary for AI context
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} Activity summary
+ */
+export const getActivitySummary = adapter.getActivitySummary;
+
+/**
+ * Clear user caches
+ * @param {string} userId - User ID
+ * @returns {Promise<boolean>}
+ */
+export const clearUserCaches = adapter.clearUserCaches;
+
+
+/* ========================================================================== */
+/*                        COACH & PLAN OPERATIONS                             */
+/* ========================================================================== */
+
+// Plan Caching
+export const getDailyPlanCache = adapter.getDailyPlanCache;
+export const saveDailyPlanCache = adapter.saveDailyPlanCache;
+export const cacheDailyPlan = adapter.saveDailyPlanCache; // Alias for coach.js compatibility
+export const invalidateDailyPlanCache = adapter.invalidateDailyPlanCache;
+
+export const getWeeklyPlanCache = adapter.getWeeklyPlanCache;
+export const saveWeeklyPlanCache = adapter.saveWeeklyPlanCache;
+export const cacheWeeklyPlan = adapter.saveWeeklyPlanCache; // Alias for coach.js compatibility
+
+// Analytics & Context
+export const getRecentActivities = adapter.getRecentActivities;
+export const getWeeklyPoints = adapter.getWeeklyPoints;
+export const calculateStreak = adapter.calculateStreak;
+
+// Coach Chat
+export const getCoachHistory = adapter.getCoachHistory;
+export const saveCoachMessage = adapter.saveCoachMessage;
+
 
 /**
  * Get database type from environment
@@ -143,3 +241,4 @@ export const getDatabaseType = () => DATABASE_TYPE;
 // Export database instances for backward compatibility (JSON adapter only)
 export const db = adapter.db;
 export const summaryDb = adapter.summaryDb;
+

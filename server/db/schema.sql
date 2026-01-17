@@ -304,7 +304,16 @@ CREATE TABLE IF NOT EXISTS weekly_plan_cache (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
     week_start DATE NOT NULL,
-    plan_data JSONB NOT NULL,
+    
+    -- Daily columns for easy SQL querying
+    monday JSONB,
+    tuesday JSONB,
+    wednesday JSONB,
+    thursday JSONB,
+    friday JSONB,
+    saturday JSONB,
+    sunday JSONB,
+    
     cached_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, week_start)
 );
@@ -320,7 +329,13 @@ CREATE TABLE IF NOT EXISTS daily_plan_cache (
     last_activity_id BIGINT,
     chat_modified BOOLEAN DEFAULT FALSE,
     cached_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, plan_date)
+    UNIQUE(user_id, plan_date),
+    -- Validate Daily Plan v2.1 Structure (3 Options)
+    CONSTRAINT valid_daily_plan_v2 CHECK (
+        plan_data ? 'recommended' AND 
+        plan_data ? 'option_2' AND 
+        plan_data ? 'option_3'
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_cache_user_date ON daily_plan_cache(user_id, plan_date);

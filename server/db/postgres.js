@@ -17,7 +17,7 @@ if (!connectionString) {
 
 // Initialize connection pool
 // Supabase requires SSL in production
-const pool = new Pool({
+export const pool = new Pool({
     connectionString,
     ssl: connectionString?.includes('supabase') ? { rejectUnauthorized: false } : false
 });
@@ -572,13 +572,59 @@ export const getGoalById = async (goalId) => {
 /**
  * Create new goal
  */
+/**
+ * Create new goal
+ */
 export const createGoal = async (userId, data) => {
-    const result = await pool.query(`
-        INSERT INTO user_goals (user_id, goal_type, target_date, weekly_target_distance, preferred_workout_days)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-    `, [userId, data.goalType, data.targetDate, data.weeklyTarget, JSON.stringify(data.preferredDays)]);
-    return result.rows[0];
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Deactivate ALL existing goals for this user
+        await client.query(`
+            UPDATE user_goals 
+            SET is_active = FALSE 
+            WHERE user_id = $1
+        `, [userId]);
+
+        // 2. Create the new ACTIVE goal
+        const result = await client.query(`
+            INSERT INTO user_goals (user_id, goal_type, target_date, weekly_target_distance, preferred_workout_days, is_active)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
+            RETURNING *
+        `, [userId, data.goalType, data.targetDate, data.weeklyTarget, JSON.stringify(data.preferredDays)]);
+
+        await client.query('COMMIT');
+
+        // Trigger generic cleanup asynchronously (don't await)
+        cleanupOldGoals(userId);
+
+        return result.rows[0];
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Garbage collect inactive goals > 30 days old
+ */
+export const cleanupOldGoals = async (userId) => {
+    try {
+        const res = await pool.query(`
+            DELETE FROM user_goals 
+            WHERE user_id = $1 
+            AND is_active = FALSE 
+            AND created_at < NOW() - INTERVAL '30 days'
+        `, [userId]);
+        if (res.rowCount > 0) {
+            console.log(`[GC] Deleted ${res.rowCount} old inactive goals for user ${userId}`);
+        }
+    } catch (err) {
+        console.error('[GC] Error deleting old goals:', err);
+    }
 };
 
 /**
@@ -599,7 +645,144 @@ export const updateGoal = async (goalId, data) => {
  * Deactivate all user goals
  */
 export const deactivateUserGoals = async (userId) => {
-    await pool.query(`UPDATE user_goals SET is_active = FALSE WHERE user_id = $1`, [userId]);
+    await pool.query('UPDATE user_goals SET is_active = FALSE WHERE user_id = $1', [userId]);
+};
+
+// ------------------------------------------------------------------
+// PLAN CACHING & STREAKS
+// ------------------------------------------------------------------
+
+
+export const getDailyPlanCache = async (userId, date) => {
+    const res = await pool.query(
+        `SELECT * FROM daily_plan_cache WHERE user_id = $1 AND plan_date = $2`,
+        [userId, date]
+    );
+    return res.rows[0];
+};
+
+export const saveDailyPlanCache = async (userId, date, planData, lastActivityId) => {
+    await pool.query(`
+        INSERT INTO daily_plan_cache (user_id, plan_date, plan_data, last_activity_id)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id, plan_date) DO UPDATE SET 
+            plan_data = EXCLUDED.plan_data,
+            last_activity_id = EXCLUDED.last_activity_id
+    `, [userId, date, planData, lastActivityId || null]);
+};
+
+export const getWeeklyPlanCache = async (userId, userWeekStart) => {
+    const res = await pool.query(
+        `SELECT week_start, monday, tuesday, wednesday, thursday, friday, saturday, sunday 
+         FROM weekly_plan_cache 
+         WHERE user_id = $1 AND week_start = $2`,
+        [userId, userWeekStart]
+    );
+
+    if (res.rows.length === 0) return null;
+
+    const row = res.rows[0];
+    const days = [
+        row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday
+    ];
+
+    // Check if we have data (if all null, return null)
+    if (days.every(d => d === null)) return null;
+
+    // Fill in missing days as "Recovery/Rest"
+    const weekStart = new Date(row.week_start);
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    const processedDays = days.map((dayData, index) => {
+        // Calculate date for this day
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + index);
+        const dateStr = date.toISOString().split('T')[0];
+
+        if (dayData) {
+            return {
+                ...dayData,
+                date: dateStr,
+                dayName: dayNames[index]
+            };
+        } else {
+            return {
+                dayName: dayNames[index],
+                date: dateStr,
+                workout_type: 'Rest',
+                title: 'Rest Day',
+                target_time: '0 mins',
+                target_pace: '-',
+                intensity: 0
+            };
+        }
+    });
+
+    return {
+        weekNumber: row.monday?.weekNumber || 1, // Fallback
+        weekTheme: row.monday?.weekTheme || 'Training',
+        weekFocus: row.monday?.weekFocus || 'General',
+        days: processedDays
+    };
+};
+
+export const saveWeeklyPlanCache = async (userId, userWeekStart, planData) => {
+    // Map array of days to columns
+    const dayMap = {};
+    if (planData.days && Array.isArray(planData.days)) {
+        planData.days.forEach(day => {
+            const lowerName = day.dayName.toLowerCase();
+            if (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(lowerName)) {
+                // Store metadata inside the day object for retrieval reconstruction if needed
+                dayMap[lowerName] = {
+                    ...day,
+                    weekNumber: planData.weekNumber,
+                    weekTheme: planData.weekTheme,
+                    weekFocus: planData.weekFocus
+                };
+            }
+        });
+    }
+
+    await pool.query(`
+        INSERT INTO weekly_plan_cache (
+            user_id, week_start, 
+            monday, tuesday, wednesday, thursday, friday, saturday, sunday
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (user_id, week_start) DO UPDATE SET 
+            monday = EXCLUDED.monday,
+            tuesday = EXCLUDED.tuesday,
+            wednesday = EXCLUDED.wednesday,
+            thursday = EXCLUDED.thursday,
+            friday = EXCLUDED.friday,
+            saturday = EXCLUDED.saturday,
+            sunday = EXCLUDED.sunday
+    `, [
+        userId, userWeekStart,
+        dayMap.monday || null, dayMap.tuesday || null, dayMap.wednesday || null, dayMap.thursday || null,
+        dayMap.friday || null, dayMap.saturday || null, dayMap.sunday || null
+    ]);
+};
+
+export const calculateStreak = async (userId) => {
+    const res = await pool.query(`
+        WITH dates AS (
+            SELECT DISTINCT date_trunc('day', start_date) as day
+            FROM activities
+            WHERE user_id = $1
+        ),
+        groups AS (
+            SELECT day, ROW_NUMBER() OVER (ORDER BY day) as rn
+            FROM dates
+        )
+        SELECT COUNT(*) as streak
+        FROM groups
+        GROUP BY day - rn * INTERVAL '1 day'
+        ORDER BY streak DESC
+        LIMIT 1
+    `, [userId]);
+    return parseInt(res.rows[0]?.streak || 0);
 };
 
 /**
@@ -621,217 +804,200 @@ export const getMasterPlan = async (goalId) => {
  * Save master plan
  */
 export const saveMasterPlan = async (goalId, planData) => {
-    await pool.query(`
-        INSERT INTO master_plans (goal_id, weeks, total_weeks, peak_week, taper_start_week, model)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (goal_id) DO UPDATE SET
-            weeks = EXCLUDED.weeks,
-            total_weeks = EXCLUDED.total_weeks,
-            peak_week = EXCLUDED.peak_week,
-            taper_start_week = EXCLUDED.taper_start_week,
-            generated_at = NOW()
-    `, [goalId, JSON.stringify(planData.weeks), planData.totalWeeks, planData.peakWeek, planData.taperStart, planData.model || 'local']);
+    console.log(`Saving master plan for goal ${goalId}. Weeks: ${planData.weeks?.length}`);
+    try {
+        await pool.query(`
+            INSERT INTO master_plans (goal_id, weeks, total_weeks, peak_week, taper_start_week, model)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (goal_id) DO UPDATE SET
+                weeks = EXCLUDED.weeks,
+                total_weeks = EXCLUDED.total_weeks,
+                peak_week = EXCLUDED.peak_week,
+                taper_start_week = EXCLUDED.taper_start_week,
+                generated_at = NOW()
+        `, [goalId, JSON.stringify(planData.weeks), planData.totalWeeks, planData.peakWeek, planData.taperStart || planData.taperStartWeek, planData.model || 'local']);
+        console.log('Master plan saved to DB successfully');
+    } catch (err) {
+        console.error('DB Error saving master plan:', err);
+        throw err;
+    }
 };
 
 /**
- * Get daily plan cache
- */
-export const getDailyPlanCache = async (userId, date) => {
-    const result = await pool.query(`
-        SELECT * FROM daily_plan_cache WHERE user_id = $1 AND plan_date = $2
-    `, [userId, date]);
-
-    if (result.rows.length === 0) return null;
-
-    const cache = result.rows[0];
-
-    // Check if stale (new activity since cache)
-    const latestActivity = await pool.query(`
-        SELECT strava_activity_id FROM activities 
-        WHERE user_id = $1 
-        ORDER BY synced_at DESC LIMIT 1
-    `, [userId]);
-
-    const latestId = latestActivity.rows[0]?.strava_activity_id;
-    const stale = latestId && latestId.toString() !== cache.last_activity_id?.toString();
-
-    return { ...cache, stale };
-};
-
-/**
- * Cache daily plan
- */
-export const cacheDailyPlan = async (userId, date, planData, lastActivityId) => {
-    await pool.query(`
-        INSERT INTO daily_plan_cache (user_id, plan_date, plan_data, last_activity_id)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id, plan_date) DO UPDATE SET
-            plan_data = EXCLUDED.plan_data,
-            last_activity_id = EXCLUDED.last_activity_id,
-            chat_modified = FALSE,
-            cached_at = NOW()
-    `, [userId, date, JSON.stringify(planData), lastActivityId]);
-};
-
-/**
- * Invalidate daily plan cache
- */
-export const invalidateDailyPlanCache = async (userId, date) => {
-    await pool.query(`DELETE FROM daily_plan_cache WHERE user_id = $1 AND plan_date = $2`, [userId, date]);
-};
-
-/**
- * Get weekly plan cache
- */
-export const getWeeklyPlanCache = async (userId, weekStart) => {
-    const result = await pool.query(`
-        SELECT * FROM weekly_plan_cache WHERE user_id = $1 AND week_start = $2
-    `, [userId, weekStart]);
-    return result.rows[0] || null;
-};
-
-/**
- * Cache weekly plan
- */
-export const cacheWeeklyPlan = async (userId, weekStart, planData) => {
-    await pool.query(`
-        INSERT INTO weekly_plan_cache (user_id, week_start, plan_data)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, week_start) DO UPDATE SET
-            plan_data = EXCLUDED.plan_data,
-            cached_at = NOW()
-    `, [userId, weekStart, JSON.stringify(planData)]);
-};
-
-/**
- * Clear all caches for user
+ * Clear all caches for a user (when goal changes)
  */
 export const clearUserCaches = async (userId) => {
-    await pool.query(`DELETE FROM daily_plan_cache WHERE user_id = $1`, [userId]);
-    await pool.query(`DELETE FROM weekly_plan_cache WHERE user_id = $1`, [userId]);
-};
+    console.log(`Clearing caches for user ${userId}`);
+    try {
+        // Clear daily plan caches
+        await pool.query(`
+            DELETE FROM daily_plan_cache WHERE user_id = $1
+        `, [userId]);
 
-/**
- * Get recent activities for AI context
- */
-export const getRecentActivities = async (userId, days = 7) => {
-    const result = await pool.query(`
-        SELECT strava_activity_id as id, name, sport_type, distance, moving_time, 
-               average_heartrate, suffer_score, start_date
-        FROM activities 
-        WHERE user_id = $1 AND start_date > NOW() - INTERVAL '${days} days'
-        ORDER BY start_date DESC
-    `, [userId]);
-    return result.rows;
-};
+        // Clear weekly plan caches
+        await pool.query(`
+            DELETE FROM weekly_plan_cache WHERE user_id = $1
+        `, [userId]);
 
-/**
- * Get activity summary for master plan generation
- */
-export const getActivitySummary = async (userId) => {
-    const result = await pool.query(`
-        SELECT 
-            COUNT(*) as total_activities,
-            AVG(distance) as avg_distance,
-            AVG(average_heartrate) as avg_hr,
-            MAX(distance) as max_distance,
-            SUM(distance) / 4 as weekly_avg_distance
-        FROM activities 
-        WHERE user_id = $1 AND start_date > NOW() - INTERVAL '30 days'
-    `, [userId]);
-    return result.rows[0];
-};
+        // Clear master plans (linked to invalid/old goals)
+        // Since goal might have been updated, we delete master plans for this user's goals
+        // Or simpler: delete all master plans for user's goals
+        // But master_plans stores goal_id, not user_id. We need to join or assume goals.js handles goal deletion
 
-/**
- * Get weekly points
- */
-export const getWeeklyPoints = async (userId) => {
-    // Get week start (Monday)
-    const result = await pool.query(`
-        SELECT COALESCE(SUM(p.points), 0) as earned
-        FROM activity_points p
-        JOIN activities a ON p.activity_id = a.strava_activity_id
-        WHERE a.user_id = $1 
-        AND a.start_date >= date_trunc('week', CURRENT_DATE)
-    `, [userId]);
+        // Wait, getting user's active goal to clear its master plan
+        const result = await pool.query(`SELECT id FROM goals WHERE user_id = $1`, [userId]);
+        const goalIds = result.rows.map(r => r.id);
 
-    const goal = await getActiveGoal(userId);
-    const weeklyGoal = goal?.weekly_target_distance ? Math.round(goal.weekly_target_distance) : 60;
-
-    return {
-        earned: parseInt(result.rows[0]?.earned || 0),
-        goal: weeklyGoal
-    };
-};
-
-/**
- * Calculate training streak
- */
-export const calculateStreak = async (userId) => {
-    // Get activities and planned rest days for last 30 days
-    const activities = await pool.query(`
-        SELECT DATE(start_date) as activity_date
-        FROM activities
-        WHERE user_id = $1 AND start_date > NOW() - INTERVAL '30 days'
-        ORDER BY start_date DESC
-    `, [userId]);
-
-    const activityDates = new Set(activities.rows.map(r => r.activity_date.toISOString().split('T')[0]));
-
-    // Get preferred rest days from goal
-    const goal = await getActiveGoal(userId);
-    const preferredDays = goal?.preferred_workout_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    // Count streak
-    let streak = 0;
-    const today = new Date();
-
-    for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        const dayName = dayNames[date.getDay()];
-
-        const isWorkoutDay = preferredDays.includes(dayName);
-        const hasActivity = activityDates.has(dateStr);
-
-        if (isWorkoutDay && !hasActivity) {
-            // Missed a workout day - streak broken
-            break;
+        if (goalIds.length > 0) {
+            await pool.query(`
+                DELETE FROM master_plans WHERE goal_id = ANY($1)
+            `, [goalIds]);
         }
 
-        // Either rest day or completed workout
-        streak++;
+        console.log('User caches and master plans cleared');
+    } catch (err) {
+        console.error('Error clearing caches:', err.message);
+        // Don't throw - cache clearing is not critical
     }
-
-    return streak;
 };
 
 /**
- * Save coach message
+ * Get activity summary for AI context
+ * Returns aggregated stats for recent activities
  */
-export const saveCoachMessage = async (userId, role, message, context = null) => {
-    await pool.query(`
-        INSERT INTO coach_conversations (user_id, role, message, context)
-        VALUES ($1, $2, $3, $4)
-    `, [userId, role, message, context ? JSON.stringify(context) : null]);
+export const getActivitySummary = async (userId) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                COUNT(*) as total_activities,
+                COALESCE(SUM(distance), 0) as total_distance,
+                COALESCE(AVG(distance), 0) as avg_distance,
+                COALESCE(AVG(average_heartrate), 0) as avg_hr,
+                MAX(start_date) as last_activity
+            FROM activities 
+            WHERE user_id = $1 AND start_date > NOW() - INTERVAL '30 days'
+        `, [userId]);
+
+        return result.rows[0] || { total_activities: 0, total_distance: 0 };
+    } catch (err) {
+        console.error('Error getting activity summary:', err.message);
+        return { total_activities: 0, total_distance: 0 };
+    }
 };
 
 /**
- * Get coach conversation history
+ * Get coach chat history for a user
  */
 export const getCoachHistory = async (userId, limit = 10) => {
-    const result = await pool.query(`
-        SELECT role, message, created_at
-        FROM coach_conversations
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2
-    `, [userId, limit]);
-    return result.rows.reverse(); // Chronological order
+    try {
+        const result = await pool.query(`
+            SELECT role, message, created_at
+            FROM coach_messages 
+            WHERE user_id = $1 
+            ORDER BY created_at DESC 
+            LIMIT $2
+        `, [userId, limit]);
+
+        return result.rows.reverse(); // Return in chronological order
+    } catch (err) {
+        // Table might not exist - return empty array
+        console.error('Error getting coach history:', err.message);
+        return [];
+    }
 };
 
-// Export pool for direct queries if needed
-export { pool };
+/**
+ * Save a coach chat message
+ */
+export const saveCoachMessage = async (userId, role, message, context = null) => {
+    try {
+        await pool.query(`
+            INSERT INTO coach_messages (user_id, role, message, context)
+            VALUES ($1, $2, $3, $4)
+        `, [userId, role, message, context ? JSON.stringify(context) : null]);
+    } catch (err) {
+        // Table might not exist - silently fail
+        console.error('Error saving coach message:', err.message);
+    }
+};
 
+/**
+ * Get weekly training points from completed activities
+ * Compares actual distance to weekly target
+ */
+export const getWeeklyPoints = async (userId) => {
+    try {
+        // Get Monday of current week
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        const weekStart = new Date(now.setDate(diff));
+        weekStart.setHours(0, 0, 0, 0);
+
+        // Get activities from this week
+        const result = await pool.query(`
+            SELECT 
+                COALESCE(SUM(distance), 0) as total_distance,
+                COUNT(*) as activity_count
+            FROM activities 
+            WHERE user_id = $1 
+            AND start_date >= $2
+            AND sport_type = 'Run'
+        `, [userId, weekStart.toISOString()]);
+
+        const row = result.rows[0];
+        const totalKm = parseFloat(row.total_distance) / 1000 || 0;
+
+        // Get weekly target from active goal
+        const goalResult = await pool.query(`
+            SELECT weekly_target_distance FROM user_goals 
+            WHERE user_id = $1 AND is_active = true 
+            LIMIT 1
+        `, [userId]);
+
+        const weeklyTarget = goalResult.rows[0]?.weekly_target_distance || 30;
+        const progressPercent = Math.min(100, Math.round((totalKm / weeklyTarget) * 100));
+
+        return {
+            completedKm: Math.round(totalKm * 10) / 10,
+            targetKm: weeklyTarget,
+            progressPercent,
+            activityCount: parseInt(row.activity_count) || 0
+        };
+    } catch (err) {
+        console.error('Error getting weekly points:', err.message);
+        return { completedKm: 0, targetKm: 30, progressPercent: 0, activityCount: 0 };
+    }
+};
+
+/**
+ * Get recent activities for a user
+ * @param {string} userId - User ID
+ * @param {number} limit - Number of activities to return (default 7)
+ */
+export const getRecentActivities = async (userId, limit = 7) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                strava_activity_id as id,
+                name,
+                sport_type,
+                distance,
+                moving_time,
+                total_elevation_gain,
+                start_date,
+                average_heartrate
+            FROM activities 
+            WHERE user_id = $1 
+            ORDER BY start_date DESC 
+            LIMIT $2
+        `, [userId, limit]);
+
+        return result.rows;
+    } catch (err) {
+        console.error('Error getting recent activities:', err.message);
+        return [];
+    }
+};
+
+// End of file

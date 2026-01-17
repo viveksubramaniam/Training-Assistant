@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Activity, TrendingUp, User, ChevronRight, Clock, Zap, CheckCircle, Circle, MessageSquare, Target, Flame, RefreshCw, X, Trophy, Map as MapIcon, LogOut, Settings, ChevronUp, ArrowLeft, Heart, Battery, Sparkles } from 'lucide-react';
 import ActivityDetailPage from './ActivityDetailPage';
 import DailyPlanTab from './DailyPlanTab';
+import CalendarPage from './CalendarPage';
 import GoalEditorModal from './GoalEditorModal';
+import TrainingPlanLoader from './TrainingPlanLoader';
+import ChatWidget from './components/ChatWidget';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 import 'leaflet/dist/leaflet.css';
@@ -1052,6 +1055,49 @@ const RunCoachAppContent = () => {
   const [currentGoal, setCurrentGoal] = useState(null);
   const [activityDetails, setActivityDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+
+  const handleSaveGoal = async (goalData) => {
+    // Determine ID and Method if editing
+    const isEdit = currentGoal?.hasGoal && currentGoal.goal?.id;
+    const method = isEdit ? 'PUT' : 'POST';
+    const url = isEdit ? `/api/goals/${currentGoal.goal.id}` : '/api/goals';
+
+    setIsGeneratingPlan(true);
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(goalData)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentGoal(data);
+
+        // Trigger orchestration to generate/regenerate master plan
+        console.log('[Goal Save] Triggering plan orchestration...');
+        try {
+          const planRes = await fetch('/api/coach/daily-plan', {
+            credentials: 'include'
+          });
+          if (planRes.ok) {
+            const planData = await planRes.json();
+            console.log('[Goal Save] Plan generated:', planData.flags);
+            // Plan will be fetched when DailyPlanTab loads
+          }
+        } catch (planErr) {
+          console.error('[Goal Save] Plan generation failed:', planErr);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save goal:', err);
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -1064,6 +1110,8 @@ const RunCoachAppContent = () => {
           console.log('User authenticated:', userData);
           setUser(userData);
           fetchActivities();
+          // Trigger background plan sync
+          fetch('/api/coach/sync', { method: 'POST', credentials: 'include' }).catch(err => console.error('Plan sync trigger failed:', err));
         } else {
           console.log('User not authenticated');
           setIsLoading(false);
@@ -2066,10 +2114,10 @@ Focus on: what went well, one area to improve, and whether the effort level was 
 
 
             <div>
-              <p className="text-xl font-bold text-white">{currentGoal.goal.type}</p>
-              {currentGoal.goal.targetDate && (
+              <p className="text-xl font-bold text-white">{currentGoal.goal.goal_type || currentGoal.goal.type}</p>
+              {(currentGoal.goal.target_date || currentGoal.goal.targetDate) && (
                 <p className="text-sm text-slate-400">
-                  Target: {new Date(currentGoal.goal.targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Target: {new Date(currentGoal.goal.target_date || currentGoal.goal.targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
             </div>
@@ -2412,15 +2460,7 @@ Focus on: what went well, one area to improve, and whether the effort level was 
           <>
             {activeTab === 'daily-plan' && <DailyPlanTab user={user} onNavigateToCalendar={() => setActiveTab('calendar')} />}
             {activeTab === 'activities' && <ActivitiesTab />}
-            {activeTab === 'calendar' && (
-              <div className="max-w-4xl mx-auto p-8 text-center">
-                <Calendar className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Calendar View</h2>
-                <p className="text-slate-400">Full calendar view coming soon!</p>
-              </div>
-
-
-            )}
+            {activeTab === 'calendar' && <CalendarPage />}
             {activeTab === 'profile' && <ProfileTab />}
           </>
         )}
@@ -2480,11 +2520,19 @@ Focus on: what went well, one area to improve, and whether the effort level was 
         isOpen={goalEditorOpen}
         onClose={() => setGoalEditorOpen(false)}
         existingGoal={currentGoal?.hasGoal ? currentGoal.goal : null}
-        onSave={async (data) => {
-          const res = await fetch('/api/goals', { credentials: 'include' });
-          if (res.ok) setCurrentGoal(await res.json());
-        }}
+        onSave={handleSaveGoal}
       />
+
+      {/* Training Plan Generation Loader */}
+      {isGeneratingPlan && <TrainingPlanLoader />}
+
+      {/* AI Chat Widget */}
+      <ChatWidget onPlanUpdate={(updatedPlan) => {
+        // Refresh daily plan when chat modifies it
+        if (updatedPlan?.dailyPlan) {
+          setDailyPlan(updatedPlan.dailyPlan);
+        }
+      }} />
     </div>
 
 

@@ -1,7 +1,8 @@
 /**
- * Goals Routes
+ * Goals Routes (Simplified for LangGraph)
  * 
- * Handles user training goal CRUD and triggers master plan generation
+ * Handles user training goal CRUD
+ * Master plan generation is done by calling /orchestrate endpoint
  */
 
 import { Router } from 'express';
@@ -13,7 +14,7 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5001';
 
 // Auth middleware
 const requireAuth = (req, res, next) => {
-    if (!req.session?.userId) {
+    if (!req.session?.stravaId) {
         return res.status(401).json({ error: 'Authentication required' });
     }
     next();
@@ -24,7 +25,7 @@ const requireAuth = (req, res, next) => {
  * Get user's active goal
  */
 router.get('/', requireAuth, async (req, res) => {
-    const userId = req.session.userId;
+    const userId = req.session.stravaId;
 
     try {
         const goal = await db.getActiveGoal(userId);
@@ -50,7 +51,7 @@ router.get('/', requireAuth, async (req, res) => {
                 totalWeeks: masterPlan.total_weeks,
                 peakWeek: masterPlan.peak_week,
                 taperStart: masterPlan.taper_start_week,
-                weeksPreview: masterPlan.weeks.slice(0, 4) // First 4 weeks preview
+                weeksPreview: masterPlan.weeks?.slice(0, 4) || []
             } : null
         });
 
@@ -62,21 +63,21 @@ router.get('/', requireAuth, async (req, res) => {
 
 /**
  * POST /api/goals
- * Create new goal and generate master plan
+ * Create new goal - master plan will be generated via /orchestrate on next load
  */
 router.post('/', requireAuth, async (req, res) => {
-    const userId = req.session.userId;
+    const userId = req.session.stravaId;
     const { goalType, targetDate, weeklyTarget, preferredDays } = req.body;
+
+    console.log(`POST /api/goals - userId: ${userId}, goalType: ${goalType}`);
 
     if (!goalType) {
         return res.status(400).json({ error: 'Goal type required' });
     }
 
     try {
-        // Deactivate any existing goals
-        await db.deactivateUserGoals(userId);
-
         // Create new goal
+        console.log('Creating new goal...');
         const goal = await db.createGoal(userId, {
             goalType,
             targetDate,
@@ -86,74 +87,38 @@ router.post('/', requireAuth, async (req, res) => {
 
         console.log(`Created goal ${goal.id} for user ${userId}`);
 
-        // Get user's activity history for context
-        const activitySummary = await db.getActivitySummary(userId);
-
-        // Generate master plan via AI
+        // Clear any existing caches so /orchestrate will generate fresh plans
         try {
-            const response = await axios.post(`${AI_SERVICE_URL}/generate-master-plan`, {
-                goal: {
-                    type: goalType,
-                    targetDate,
-                    weeklyTarget
-                },
-                preferredDays,
-                userHistory: activitySummary
-            }, { timeout: 60000 });
-
-            const masterPlanData = response.data;
-
-            // Save master plan
-            await db.saveMasterPlan(goal.id, masterPlanData);
-
-            console.log(`Generated master plan for goal ${goal.id}`);
-
-            res.json({
-                success: true,
-                goal: {
-                    id: goal.id,
-                    type: goalType,
-                    targetDate,
-                    weeklyTarget,
-                    preferredDays
-                },
-                masterPlan: {
-                    totalWeeks: masterPlanData.totalWeeks,
-                    peakWeek: masterPlanData.peakWeek,
-                    taperStart: masterPlanData.taperStart
-                }
-            });
-
-        } catch (aiError) {
-            console.error('Master plan generation failed:', aiError.message);
-
-            // Goal created but plan failed - still return success
-            res.json({
-                success: true,
-                goal: {
-                    id: goal.id,
-                    type: goalType,
-                    targetDate,
-                    weeklyTarget,
-                    preferredDays
-                },
-                masterPlan: null,
-                warning: 'Goal saved but master plan generation failed. Will retry on next load.'
-            });
+            await db.clearUserCaches(userId);
+        } catch (e) {
+            console.log('Cache clear skipped:', e.message);
         }
+
+        res.json({
+            success: true,
+            hasGoal: true,
+            goal: {
+                id: goal.id,
+                type: goalType,
+                targetDate,
+                weeklyTarget,
+                preferredDays
+            },
+            message: 'Goal created. Master plan will be generated when you view your daily plan.'
+        });
 
     } catch (error) {
         console.error('Create goal failed:', error.message);
-        res.status(500).json({ error: 'Failed to create goal' });
+        res.status(500).json({ error: 'Failed to create goal', details: error.message });
     }
 });
 
 /**
  * PUT /api/goals/:id
- * Update existing goal (regenerates master plan)
+ * Update existing goal - clears caches, plan regenerates on next load
  */
 router.put('/:id', requireAuth, async (req, res) => {
-    const userId = req.session.userId;
+    const userId = req.session.stravaId;
     const goalId = req.params.id;
     const { goalType, targetDate, weeklyTarget, preferredDays } = req.body;
 
@@ -172,37 +137,25 @@ router.put('/:id', requireAuth, async (req, res) => {
             preferredDays
         });
 
-        // Clear existing caches
-        await db.clearUserCaches(userId);
-
-        // Regenerate master plan
-        const activitySummary = await db.getActivitySummary(userId);
-
+        // Clear caches so /orchestrate will generate fresh plans
         try {
-            const response = await axios.post(`${AI_SERVICE_URL}/generate-master-plan`, {
-                goal: {
-                    type: goalType || existingGoal.goal_type,
-                    targetDate: targetDate || existingGoal.target_date,
-                    weeklyTarget: weeklyTarget || existingGoal.weekly_target_distance
-                },
-                preferredDays: preferredDays || existingGoal.preferred_workout_days,
-                userHistory: activitySummary
-            }, { timeout: 60000 });
-
-            await db.saveMasterPlan(goalId, response.data);
-
-            res.json({
-                success: true,
-                message: 'Goal updated and plan regenerated'
-            });
-
-        } catch (aiError) {
-            res.json({
-                success: true,
-                message: 'Goal updated but plan regeneration failed',
-                warning: aiError.message
-            });
+            await db.clearUserCaches(userId);
+        } catch (e) {
+            console.log('Cache clear skipped:', e.message);
         }
+
+        res.json({
+            success: true,
+            hasGoal: true,
+            goal: {
+                id: goalId,
+                type: goalType || existingGoal.goal_type,
+                targetDate: targetDate || existingGoal.target_date,
+                weeklyTarget: weeklyTarget || existingGoal.weekly_target_distance,
+                preferredDays: preferredDays || existingGoal.preferred_workout_days
+            },
+            message: 'Goal updated. Plan will regenerate when you view your daily plan.'
+        });
 
     } catch (error) {
         console.error('Update goal failed:', error.message);
@@ -215,7 +168,7 @@ router.put('/:id', requireAuth, async (req, res) => {
  * Delete a goal
  */
 router.delete('/:id', requireAuth, async (req, res) => {
-    const userId = req.session.userId;
+    const userId = req.session.stravaId;
     const goalId = req.params.id;
 
     try {
@@ -225,7 +178,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
         }
 
         await db.deleteGoal(goalId);
-        await db.clearUserCaches(userId);
+
+        try {
+            await db.clearUserCaches(userId);
+        } catch (e) {
+            console.log('Cache clear skipped:', e.message);
+        }
 
         res.json({ success: true });
 
