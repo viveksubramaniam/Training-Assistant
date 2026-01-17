@@ -53,14 +53,14 @@ const TrainingPhasesView = ({ masterPlan }) => {
                 );
             })}
 
-            {/* Race Day Node */}
-            <div className="relative pl-8 border-l-2 border-slate-700 pb-2">
-                <div className="absolute -left-[11px] top-0 w-6 h-6 rounded-full bg-white border-4 border-[#0f172a] flex items-center justify-center">
-                    <span className="material-symbols-outlined text-black text-xs">flag</span>
+            {/* Program Ends Node */}
+            <div className="relative pl-5 border-l-2 border-slate-700 pb-2">
+                <div className="absolute -left-[11px] top-0 w-6 h-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center overflow-hidden">
+                    <span className="material-symbols-outlined text-slate-500 text-[14px] scale-150">sports_score</span>
                 </div>
-                <div className="glass-card p-5 rounded-xl border border-white/10 bg-gradient-to-r from-slate-800 to-slate-900">
-                    <h3 className="text-xl font-black italic text-white uppercase">Race Day</h3>
-                    <p className="text-sm text-slate-400">The big event. You are ready.</p>
+                <div className="glass-card p-3 rounded-xl border border-white/5 opacity-60">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Program Ends</h3>
+                    <p className="text-[10px] text-slate-500">A stronger, faster you.</p>
                 </div>
             </div>
         </div>

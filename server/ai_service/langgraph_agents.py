@@ -290,6 +290,8 @@ Create a periodized plan with phases:
 3. Peak Phase (weeks 9-{total_weeks-2}): Race-specific training, highest intensity
 4. Taper (final 1-2 weeks): Reduce volume, maintain intensity
 
+If there are not so many weeks, you can take a call on how to split the weeeks. Minimum 1 week of a plan is expected. 
+
 Respond with ONLY valid JSON, dont enter newlines or extra spaces:
 {{
   "weeks": [
@@ -444,13 +446,15 @@ Create exactly 7 days with varied workouts. Include:
 - 1-2 interval/speed sessions
 - 2-3 easy runs
 
+IMPORTANT: The values in the JSON structure below are just for format reference (e.g. distance must be a number). You MUST generate specific, appropriate values for target_time, target_pace, distance, and intensity based on the athlete's level and the goal of the specific workout. Do not simply copy the example values.
+
 Respond with ONLY valid JSON:
 {{
   "weekNumber": {current_week},
   "weekTheme": "{week_theme}",
   "weekFocus": "{week_focus}",
   "days": [
-    {{"date": "YYYY-MM-DD", "dayName": "Monday", "title": "...", "workout_type": "Easy Run|Interval|Long Run|Tempo|Rest", "target_time": "{what you see fit}", "target_pace": "{what you see fit}", "distance": {what you see fit}, "intensity": 1 (easy)|2 (moderate)|3 (intense), "description": "..."}}
+    {{"date": "YYYY-MM-DD", "dayName": "Monday", "title": "Workout Title", "workout_type": "Easy Run|Interval|Long Run|Tempo|Rest", "target_time": "e.g. 45 mins", "target_pace": "e.g. 5:30 /km", "distance": 5, "intensity": 2, "description": "Specific workout details..."}}
   ],
   "restDays": 2
 }}"""
