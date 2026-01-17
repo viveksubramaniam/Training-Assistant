@@ -4,7 +4,7 @@ requests==2.32.3
 python-dotenv==1.0.1
 pydantic==2.10.0
 
-# Future LangChain dependencies (uncomment when ready)
-# langchain==0.3.0
-# langchain-openai==0.2.0
-# langchain-community==0.3.0
+# LangGraph for multi-agent orchestration
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0

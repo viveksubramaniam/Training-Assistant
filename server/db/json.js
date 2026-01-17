@@ -230,6 +230,156 @@ export const searchSimilarActivities = async (userId, embedding, limit = 10) => 
     return [];
 };
 
+/* ========================================================================== */
+/*                           GOAL OPERATIONS                                  */
+/* ========================================================================== */
+
+// Initialize goals storage
+if (!activitiesDb.data.goals) {
+    activitiesDb.data.goals = [];
+    await activitiesDb.write();
+}
+
+if (!activitiesDb.data.masterPlans) {
+    activitiesDb.data.masterPlans = [];
+    await activitiesDb.write();
+}
+
+/**
+ * Get active goal for a user
+ */
+export const getActiveGoal = async (userId) => {
+    return activitiesDb.data.goals.find(g =>
+        g.user_id.toString() === userId.toString() && g.is_active
+    ) || null;
+};
+
+/**
+ * Get goal by ID
+ */
+export const getGoalById = async (goalId) => {
+    return activitiesDb.data.goals.find(g => g.id === goalId) || null;
+};
+
+/**
+ * Create a new goal
+ */
+export const createGoal = async (userId, { goalType, targetDate, weeklyTarget, preferredDays }) => {
+    const goal = {
+        id: `goal_${Date.now()}`,
+        user_id: userId,
+        goal_type: goalType,
+        target_date: targetDate,
+        weekly_target_distance: weeklyTarget,
+        preferred_workout_days: preferredDays || [],
+        is_active: true,
+        created_at: new Date().toISOString()
+    };
+
+    activitiesDb.data.goals.push(goal);
+    await activitiesDb.write();
+    return goal;
+};
+
+/**
+ * Update an existing goal
+ */
+export const updateGoal = async (goalId, { goalType, targetDate, weeklyTarget, preferredDays }) => {
+    const index = activitiesDb.data.goals.findIndex(g => g.id === goalId);
+    if (index === -1) return null;
+
+    const goal = activitiesDb.data.goals[index];
+    if (goalType) goal.goal_type = goalType;
+    if (targetDate !== undefined) goal.target_date = targetDate;
+    if (weeklyTarget !== undefined) goal.weekly_target_distance = weeklyTarget;
+    if (preferredDays) goal.preferred_workout_days = preferredDays;
+    goal.updated_at = new Date().toISOString();
+
+    await activitiesDb.write();
+    return goal;
+};
+
+/**
+ * Deactivate all goals for a user
+ */
+export const deactivateUserGoals = async (userId) => {
+    activitiesDb.data.goals.forEach(g => {
+        if (g.user_id.toString() === userId.toString()) {
+            g.is_active = false;
+        }
+    });
+    await activitiesDb.write();
+};
+
+/**
+ * Delete a goal
+ */
+export const deleteGoal = async (goalId) => {
+    const index = activitiesDb.data.goals.findIndex(g => g.id === goalId);
+    if (index === -1) return false;
+    activitiesDb.data.goals.splice(index, 1);
+    await activitiesDb.write();
+    return true;
+};
+
+/**
+ * Get master plan for a goal
+ */
+export const getMasterPlan = async (goalId) => {
+    return activitiesDb.data.masterPlans.find(p => p.goal_id === goalId) || null;
+};
+
+/**
+ * Save master plan for a goal
+ */
+export const saveMasterPlan = async (goalId, planData) => {
+    const index = activitiesDb.data.masterPlans.findIndex(p => p.goal_id === goalId);
+
+    const plan = {
+        goal_id: goalId,
+        ...planData,
+        created_at: new Date().toISOString()
+    };
+
+    if (index > -1) {
+        activitiesDb.data.masterPlans[index] = plan;
+    } else {
+        activitiesDb.data.masterPlans.push(plan);
+    }
+
+    await activitiesDb.write();
+    return plan;
+};
+
+/**
+ * Get activity summary for AI context
+ */
+export const getActivitySummary = async (userId) => {
+    const activities = listActivities(userId);
+    const recentActivities = activities.slice(0, 20);
+
+    const totalDistance = recentActivities.reduce((sum, a) => sum + (a.distance || 0), 0);
+    const avgPace = recentActivities.length > 0
+        ? recentActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0) / (totalDistance / 1000 || 1)
+        : 0;
+
+    return {
+        recentActivityCount: recentActivities.length,
+        totalDistanceKm: Math.round(totalDistance / 1000),
+        avgPaceMinPerKm: Math.round(avgPace / 60 * 10) / 10,
+        activityTypes: [...new Set(recentActivities.map(a => a.type))]
+    };
+};
+
+/**
+ * Clear user caches (placeholder for JSON adapter)
+ */
+export const clearUserCaches = async (userId) => {
+    // JSON adapter doesn't have separate caches
+    return true;
+};
+
 // Export database instances for backward compatibility
 export const db = activitiesDb;
 export const summaryDb = summariesDb;
+
