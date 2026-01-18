@@ -1,10 +1,10 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-requests==2.32.3
-python-dotenv==1.0.1
-pydantic==2.10.0
-
-# LangGraph for multi-agent orchestration
-langgraph>=0.2.0
-langchain-core>=0.3.0
-langchain-community>=0.3.0
+fastapi
+uvicorn
+pydantic
+python-dotenv
+requests
+langgraph
+langchain
+langchain-core
+langchain-google-genai
+httpx

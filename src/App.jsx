@@ -3,6 +3,7 @@ import DailyPlanTab from './DailyPlanTab';
 import CalendarPage from './CalendarPage';
 import ProfilePage from './ProfilePage';
 import ActivityDetailPage from './ActivityDetailPage';
+import ChatWidget from './components/ChatWidget';
 import { Clock, RefreshCw, Zap, Award, Activity } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -48,6 +49,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [activityFilter, setActivityFilter] = useState('All');
+  const [showChat, setShowChat] = useState(false); // Global chat state
 
   // Fetch initial data
   useEffect(() => {
@@ -143,7 +145,7 @@ const App = () => {
         )}
 
         {activeTab === 'stats' && (() => {
-          // Get unique activity types for filter options
+          // Stats view code (unchanged)
           const activityTypes = ['All', ...new Set(activities.map(a => a.type).filter(Boolean))];
           const filteredActivities = activityFilter === 'All'
             ? activities
@@ -230,39 +232,55 @@ const App = () => {
         </div>
       )}
 
+      {/* Global Chat Widget Overlay */}
+      <ChatWidget
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+        onPlanUpdate={() => handleSync()} // Refresh plan on update? Or refetch plan
+      />
+
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 w-full max-w-[450px] h-16 bg-[#0f172a]/95 backdrop-blur-xl border-t border-white/5 px-8 flex items-center justify-between z-40 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
-        >
-          <span className={`material-symbols-outlined text-[24px] ${activeTab === 'home' ? 'fill-1' : ''}`}>home</span>
-          <span className="text-[8px] font-bold uppercase tracking-wider">Home</span>
-        </button>
+      <nav className="fixed bottom-0 w-full max-w-[450px] h-16 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/80 to-transparent backdrop-blur-[2px] z-40">
+        <div className="grid grid-cols-5 h-full items-center">
 
-        <button
-          onClick={() => setActiveTab('plan')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'plan' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
-        >
-          <span className={`material-symbols-outlined text-[24px] ${activeTab === 'plan' ? 'fill-1' : ''}`}>calendar_month</span>
-          <span className="text-[8px] font-bold uppercase tracking-wider">Calendar</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('home')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <span className={`material-symbols-outlined text-[26px] ${activeTab === 'home' ? 'fill-1' : ''}`}>home</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('stats')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'stats' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
-        >
-          <span className={`material-symbols-outlined text-[24px] ${activeTab === 'stats' ? 'fill-1' : ''}`}>monitoring</span>
-          <span className="text-[8px] font-bold uppercase tracking-wider">Activities</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('plan')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'plan' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <span className={`material-symbols-outlined text-[26px] ${activeTab === 'plan' ? 'fill-1' : ''}`}>calendar_month</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
-        >
-          <span className={`material-symbols-outlined text-[24px] ${activeTab === 'profile' ? 'fill-1' : ''}`}>person</span>
-          <span className="text-[8px] font-bold uppercase tracking-wider">Profile</span>
-        </button>
+          {/* Center Chat FAB */}
+          <div className="flex justify-center translate-y-2">
+            <button
+              onClick={() => setShowChat(!showChat)}
+              className="w-11 h-11 rounded-full bg-primary/10 backdrop-blur-md flex items-center justify-center border border-primary/50 shadow-[0_0_15px_rgba(249,116,21,0.3)] hover:bg-primary/20 hover:scale-105 transition-all text-primary"
+            >
+              <span className="material-symbols-outlined text-[24px]">psychology</span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'stats' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <span className={`material-symbols-outlined text-[26px] ${activeTab === 'stats' ? 'fill-1' : ''}`}>monitoring</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-primary' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <span className={`material-symbols-outlined text-[26px] ${activeTab === 'profile' ? 'fill-1' : ''}`}>person</span>
+          </button>
+        </div>
       </nav>
 
     </div>

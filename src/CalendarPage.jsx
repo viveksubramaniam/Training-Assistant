@@ -141,7 +141,7 @@ const CalendarPage = () => {
     return (
         <div className="flex flex-col min-h-screen bg-deep-slate text-white pb-24 font-display">
             {/* Header (Simplified) */}
-            <header className="sticky top-0 z-50 glass-panel px-4 py-3 flex items-center justify-center border-b border-white/5">
+            <header className="sticky top-0 z-50 bg-gradient-to-b from-[#0f172a] via-[#0f172a]/80 to-transparent px-4 py-4 flex items-center justify-center">
                 <h1 className="text-base font-bold tracking-tight uppercase">Calendar</h1>
             </header>
 
