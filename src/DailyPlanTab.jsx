@@ -40,15 +40,15 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                             <span className="material-symbols-outlined text-2xl font-bold text-primary">shadow</span>
                         </div>
                         <div>
-                            <h1 className="text-lg font-black tracking-tighter text-white">ECLIPSE <span className="text-primary">V2</span></h1>
-                            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Adaptive Coach</p>
+                            <h1 className="text-base font-bold tracking-tight text-white">ECLIPSE <span className="text-primary">V2</span></h1>
+                            <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Adaptive Coach</p>
                         </div>
                     </div>
 
                     {/* Big Streak Bubble */}
-                    <div className="flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 px-4 py-2 rounded-full border border-orange-500/30">
-                        <span className="material-symbols-outlined text-orange-500 text-lg">local_fire_department</span>
-                        <span className="text-sm font-bold text-orange-400 tracking-wide">12 Day Streak</span>
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 px-3 py-1.5 rounded-full border border-orange-500/30">
+                        <span className="material-symbols-outlined text-orange-500 text-base">local_fire_department</span>
+                        <span className="text-xs font-bold text-orange-400 tracking-wide">12 Day Streak</span>
                     </div>
                 </div>
             </header>
@@ -58,8 +58,8 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                 {/* 1. Today's Focus Section */}
                 <section className="space-y-4">
                     <div className="flex items-baseline justify-between">
-                        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-400">Today's Focus</h2>
-                        <span className="text-[10px] font-bold opacity-50 uppercase text-slate-500">Oct 24</span>
+                        <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">Today's Focus</h2>
+                        <span className="text-[10px] font-medium opacity-50 uppercase text-slate-500">Oct 24</span>
                     </div>
                     <div className="flex flex-col gap-3">
                         {todayFocus.map((item, idx) => (
@@ -82,14 +82,14 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                                         <span className={`text-[9px] font-bold uppercase tracking-widest ${item.levelColor}`}>
                                             {item.level}
                                         </span>
-                                        <span className={`text-[10px] font-bold ${item.recommended ? 'text-primary' : 'opacity-60 text-white'}`}>{item.duration}</span>
+                                        <span className={`text-[10px] font-medium ${item.recommended ? 'text-primary' : 'opacity-60 text-white'}`}>{item.duration}</span>
                                     </div>
-                                    <h3 className="text-base font-bold text-white leading-tight">{item.title}</h3>
+                                    <h3 className="text-sm font-bold text-white leading-tight">{item.title}</h3>
                                 </div>
 
                                 {item.recommended ? (
-                                    <button className="relative z-10 w-9 h-9 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-orange-500/30 group-hover:scale-110 transition-transform">
-                                        <span className="material-symbols-outlined text-white text-lg">play_arrow</span>
+                                    <button className="relative z-10 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-orange-500/30 group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-white text-base">play_arrow</span>
                                     </button>
                                 ) : (
                                     <span className="material-symbols-outlined text-slate-600">chevron_right</span>
@@ -107,21 +107,21 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
 
                     <div className="flex items-center gap-6 relative z-10">
                         {/* Points Figure / Progress Circle */}
-                        <div className="relative w-24 h-24 flex-none">
+                        <div className="relative w-20 h-20 flex-none">
                             <svg className="w-full h-full -rotate-90 drop-shadow-xl" viewBox="0 0 100 100">
                                 <circle className="text-slate-800" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeWidth="8"></circle>
                                 <circle className="text-primary" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeDasharray="263.8" strokeDashoffset="79" strokeLinecap="round" strokeWidth="8"></circle>
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-2xl font-black text-white leading-none tracking-tighter">42</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">/ 60</span>
+                                <span className="text-xl font-bold text-white leading-none tracking-tight">42</span>
+                                <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">/ 60</span>
                             </div>
                         </div>
 
                         {/* Text Content */}
                         <div className="space-y-1">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-300">Week Progress</h3>
-                            <p className="text-2xl font-black text-white">Day 4 <span className="text-slate-500 text-lg">/ 7</span></p>
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">Week Progress</h3>
+                            <p className="text-xl font-bold text-white">Day 4 <span className="text-slate-500 text-base font-medium">/ 7</span></p>
                             <p className="text-xs text-indigo-200/60 leading-relaxed">You are crushing your weekly volume goals. Keep it up!</p>
                         </div>
                     </div>
@@ -130,35 +130,35 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                 {/* 3. The Road Ahead (Moved Down) */}
                 <section className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-400">The Road Ahead</h2>
-                        <button className="text-[10px] font-bold text-primary hover:text-orange-300 transition-colors" onClick={onNavigateToCalendar}>Full Calendar</button>
+                        <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">The Road Ahead</h2>
+                        <button className="text-[10px] font-medium text-primary hover:text-orange-300 transition-colors" onClick={onNavigateToCalendar}>Full Calendar</button>
                     </div>
                     <div className="flex overflow-x-auto gap-4 hide-scrollbar pb-4 -mx-5 px-5 snap-x">
                         {/* Mock Upcoming Days */}
-                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-2xl border-l-4 border-l-primary snap-center flex flex-col justify-between h-32">
+                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border-l-4 border-l-primary snap-center flex flex-col justify-between h-28">
                             <div>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-widest">Fri</p>
-                                <h4 className="text-lg font-bold mt-1 text-white leading-tight">Speed Intervals</h4>
+                                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Fri</p>
+                                <h4 className="text-sm font-bold mt-1 text-white leading-tight">Speed Intervals</h4>
                             </div>
                             <div className="flex items-center justify-between border-t border-white/5 pt-2">
                                 <span className="text-[10px] font-mono text-slate-400">12k • 5am</span>
                                 <span className="material-symbols-outlined text-sm text-primary">bolt</span>
                             </div>
                         </div>
-                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-2xl border border-white/5 snap-center flex flex-col justify-between h-32 hover:bg-slate-800 transition-colors cursor-pointer">
+                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border border-white/5 snap-center flex flex-col justify-between h-28 hover:bg-slate-800 transition-colors cursor-pointer">
                             <div>
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sat</p>
-                                <h4 className="text-lg font-bold mt-1 text-white leading-tight">Long Run</h4>
+                                <h4 className="text-sm font-bold mt-1 text-white leading-tight">Long Run</h4>
                             </div>
                             <div className="flex items-center justify-between border-t border-white/5 pt-2">
                                 <span className="text-[10px] font-mono text-slate-400">24k • 7am</span>
                                 <span className="material-symbols-outlined text-sm text-slate-500">timer</span>
                             </div>
                         </div>
-                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-2xl border border-white/5 snap-center flex flex-col justify-between h-32 hover:bg-slate-800 transition-colors cursor-pointer">
+                        <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border border-white/5 snap-center flex flex-col justify-between h-28 hover:bg-slate-800 transition-colors cursor-pointer">
                             <div>
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sun</p>
-                                <h4 className="text-lg font-bold mt-1 text-white leading-tight">Active Rest</h4>
+                                <h4 className="text-sm font-bold mt-1 text-white leading-tight">Active Rest</h4>
                             </div>
                             <div className="flex items-center justify-between border-t border-white/5 pt-2">
                                 <span className="text-[10px] font-mono text-slate-400">Yoga</span>
