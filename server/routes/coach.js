@@ -68,10 +68,22 @@ const triggerOrchestration = async (userId) => {
         const state = response.data;
         const result = state.result || {};
 
-        const weeklyPlan = result.weeklyPlan || state.weekly_plan;
-        const dailyPlan = result.dailyPlan || state.daily_plan;
-        const todayWorkout = result.todayWorkout; // Only in result
-        const flags = result.flags || {};
+        console.log('[Async] AI Response State Keys:', Object.keys(state));
+        if (state.result) console.log('[Async] AI Response Result Keys:', Object.keys(state.result));
+
+        const weeklyPlan = result.weeklyPlan || state.weekly_plan || state.weeklyPlan;
+        console.log('[Async] Extracted Weekly Plan:', weeklyPlan ? 'Yes (Object)' : 'No/Null/Undefined');
+
+        const dailyPlan = result.dailyPlan || state.daily_plan || state.dailyPlan;
+        const todayWorkout = result.todayWorkout || state.todayWorkout;
+        const flags = result.flags || state.flags || {};
+
+        // Extract and Save Master Plan if newly generated (or returned)
+        const newMasterPlan = result.masterPlan || result.master_plan || state.masterPlan || state.master_plan;
+        if (newMasterPlan && newMasterPlan.weeks) {
+            console.log(`[Async] Saving/Updating master plan`);
+            await db.saveMasterPlan(goal.id, newMasterPlan);
+        }
 
         // Cache weekly plan if newly generated
         if (weeklyPlan && !cachedWeekly) {
@@ -80,7 +92,7 @@ const triggerOrchestration = async (userId) => {
         }
 
         if (dailyPlan) {
-            console.log(`[Async] Caching new daily plan`);
+            console.log(`[Async] Caching new daily plan. dailyPlan keys:`, Object.keys(dailyPlan));
             const today = new Date().toISOString().split('T')[0];
             const latestActivity = await db.getRecentActivities(userId, 1);
             const latestActivityId = latestActivity[0]?.id || null;
@@ -94,13 +106,26 @@ const triggerOrchestration = async (userId) => {
                 flags
             };
 
-            await db.cacheDailyPlan(userId, today, finalDailyPlan, latestActivityId);
+            console.log(`[Async] Final daily plan structure (truncated):`, JSON.stringify(finalDailyPlan).substring(0, 500));
+            try {
+                await db.cacheDailyPlan(userId, today, finalDailyPlan, latestActivityId);
+                console.log(`[Async] Daily plan saved successfully for ${today}`);
+            } catch (saveError) {
+                console.error(`[Async] FAILED to save daily plan:`, saveError.message);
+            }
+        } else {
+            console.log(`[Async] No dailyPlan returned from AI service. Result keys:`, Object.keys(result), `State keys:`, Object.keys(state));
         }
 
         console.log(`[Async] Orchestration complete for user ${userId}`);
 
     } catch (error) {
         console.error('[Async] Orchestration failed:', error.message);
+        if (error.code === 'ECONNREFUSED') {
+            console.error('[Async] AI service is not reachable at', AI_SERVICE_URL);
+        } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+            console.error('[Async] Request timed out - AI service may be overloaded');
+        }
     }
 };
 
@@ -113,7 +138,16 @@ router.post('/sync', requireAuth, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const weekStart = getWeekStart();
 
+    const goal = await db.getActiveGoal(userId);
+    if (!goal) {
+        return res.json({
+            status: 'no_goal',
+            message: 'No active goal found'
+        });
+    }
+
     // Check if we have valid plans
+    const masterPlan = await db.getMasterPlan(goal.id);
     const hasDaily = await db.getDailyPlanCache(userId, today);
     const hasWeekly = await db.getWeeklyPlanCache(userId, weekStart);
 
@@ -121,7 +155,8 @@ router.post('/sync', requireAuth, async (req, res) => {
     const isDailyValid = hasDaily && !hasDaily.stale &&
         (hasDaily.plan_data.dailyPlan || hasDaily.plan_data.recommended);
 
-    if (!isDailyValid || !hasWeekly) {
+    // Trigger if any plan is missing: Master, Weekly, or Daily
+    if (!masterPlan || !hasWeekly || !isDailyValid) {
         // Trigger background generation (fire and forget)
         triggerOrchestration(userId).catch(err => console.error('Background sync crashed', err));
 

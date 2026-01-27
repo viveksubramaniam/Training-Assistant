@@ -315,6 +315,7 @@ Respond with ONLY valid JSON, dont enter newlines or extra spaces:
             state["master_plan"] = master_plan
             state["is_master_plan_ready"] = True
             print("[Master Planning Agent] Master plan generated via LLM")
+            print(f"[Master Planning Agent] RESPONSE: {json.dumps(master_plan, indent=2)[:1000]}...")
         else:
             raise ValueError("No JSON found in response")
             
@@ -471,6 +472,7 @@ Respond with ONLY valid JSON:
             state["is_weekly_plan_ready"] = True
             state["needs_weekly_update"] = False
             state["pending_modification"] = None  # Clear after applying
+            print(f"[Weekly Planner] RESPONSE: {json.dumps(weekly_plan, indent=2)[:1000]}...")
         else:
             raise ValueError("No JSON found in response")
             
@@ -622,6 +624,7 @@ Respond with ONLY valid JSON:
             daily_plan["fromWeeklyPlan"] = today_workout
             state["daily_plan"] = daily_plan
             state["is_daily_plan_ready"] = True
+            print(f"[Daily Planner] RESPONSE: {json.dumps(daily_plan, indent=2)[:1000]}...")
         else:
             raise ValueError("No JSON found in response")
             
@@ -681,6 +684,10 @@ def prepare_result(state: PlanState) -> PlanState:
             "dailyPlanReady": state.get("is_daily_plan_ready", False)
         }
     }
+    print(f"[prepare_result] Final result flags: {state['result']['flags']}")
+    print(f"[prepare_result] Has masterPlan: {state['result']['masterPlan'] is not None}")
+    print(f"[prepare_result] Has weeklyPlan: {state['result']['weeklyPlan'] is not None}")
+    print(f"[prepare_result] Has dailyPlan: {state['result']['dailyPlan'] is not None}")
     return state
 
 

@@ -16,10 +16,13 @@ if (!connectionString) {
 }
 
 // Initialize connection pool
-// Supabase requires SSL in production
+// Supabase pooler requires SSL with certificate bypass
+const isSupabase = connectionString?.includes('supabase');
+// Strip query params to prevent sslmode conflicts
+const cleanConnectionString = connectionString?.replace(/\?.*$/, '');
 export const pool = new Pool({
-    connectionString,
-    ssl: connectionString?.includes('supabase') ? { rejectUnauthorized: false } : false
+    connectionString: cleanConnectionString,
+    ssl: isSupabase ? { rejectUnauthorized: false } : false
 });
 
 // Test connection on startup
@@ -666,13 +669,20 @@ export const getDailyPlanCache = async (userId, date) => {
 };
 
 export const saveDailyPlanCache = async (userId, date, planData, lastActivityId) => {
-    await pool.query(`
-        INSERT INTO daily_plan_cache (user_id, plan_date, plan_data, last_activity_id)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id, plan_date) DO UPDATE SET 
-            plan_data = EXCLUDED.plan_data,
-            last_activity_id = EXCLUDED.last_activity_id
-    `, [userId, date, planData, lastActivityId || null]);
+    console.log(`[DB] saveDailyPlanCache called for user ${userId}, date ${date}`);
+    try {
+        await pool.query(`
+            INSERT INTO daily_plan_cache (user_id, plan_date, plan_data, last_activity_id)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, plan_date) DO UPDATE SET 
+                plan_data = EXCLUDED.plan_data,
+                last_activity_id = EXCLUDED.last_activity_id
+        `, [userId, date, planData, lastActivityId || null]);
+        console.log(`[DB] Daily plan cache saved successfully for ${date}`);
+    } catch (err) {
+        console.error(`[DB] FAILED to save daily plan cache:`, err.message);
+        throw err;
+    }
 };
 
 export const getWeeklyPlanCache = async (userId, userWeekStart) => {
