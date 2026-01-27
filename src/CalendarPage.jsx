@@ -14,16 +14,27 @@ const CalendarPage = () => {
 
     // Key addition: Ref for scrolling
     const scrollContainerRef = useRef(null);
+    const hasTriggeredSync = useRef(false);
 
     // Fetch Plans
     useEffect(() => {
         let isMounted = true;
-        const fetchPlans = async () => {
+        const fetchPlans = async (isPolling = false) => {
             try {
-                if (isMounted && !weeklyPlan) setLoading(true);
+                if (isMounted && !weeklyPlan && !isPolling) setLoading(true);
 
                 const masterRes = await fetch('/api/coach/master-plan');
                 const masterData = await masterRes.json();
+
+                // Handle No Goal case
+                if (masterData.error === "No active goal") {
+                    if (isMounted) {
+                        setMasterPlan({ error: "No active goal" }); // Set special state
+                        setLoading(false);
+                        return; // Stop here, no sync
+                    }
+                }
+
                 if (isMounted && masterData && !masterData.error) setMasterPlan(masterData);
 
                 const weeklyRes = await fetch('/api/coach/weekly-plan');
@@ -33,6 +44,33 @@ const CalendarPage = () => {
                     if (weeklyData.status !== 'generating') {
                         setWeeklyPlan(weeklyData);
                         setLoading(false);
+                    }
+                }
+
+                // If master plan is essentially empty (no weeks) but no error, we need to sync
+                // OR if weekly plan is generating (missing)
+                const masterMissing = !masterData.weeks || masterData.weeks.length === 0;
+                const weeklyMissing = weeklyData.status === 'generating';
+                const needsSync = masterMissing || weeklyMissing;
+
+                // Only trigger sync if we are NOT polling
+                if (needsSync && !isPolling) {
+                    if (!hasTriggeredSync.current) {
+                        console.log("Plans missing (Master: " + masterMissing + ", Weekly: " + weeklyMissing + "), triggering sync...");
+                        hasTriggeredSync.current = true;
+                        await fetch('/api/coach/sync', { method: 'POST' });
+                    }
+                }
+
+                if (isMounted) {
+                    // If generating, maybe poll?
+                    const isGenerating = weeklyData.status === 'generating';
+
+                    // Retry ONLY if it's still generating
+                    if (isGenerating) {
+                        setTimeout(() => {
+                            if (isMounted) fetchPlans(true); // Pass true to avoid re-triggering sync
+                        }, 3000);
                     }
                 }
             } catch (err) {
@@ -129,6 +167,25 @@ const CalendarPage = () => {
 
         return <span className={`text-[9px] font-bold uppercase mb-0.5 ${color}`}>{label}</span>;
     };
+
+    // No Goal State
+    if (masterPlan && masterPlan.error === "No active goal") {
+        return (
+            <div className="flex flex-col h-screen bg-deep-slate text-white items-center justify-center p-6 text-center">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-3xl text-slate-400">flag</span>
+                </div>
+                <h2 className="text-xl font-bold mb-2">No Active Goal</h2>
+                <p className="text-slate-400 text-sm mb-8 max-w-xs leading-relaxed">
+                    Set a training goal to generate your personalized master plan and schedule.
+                </p>
+                <a href="/profile" onClick={(e) => { e.preventDefault(); window.location.href = '/profile'; /* Or use router logic if available, but simplistic for now */ }} className="bg-primary text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-900/20 active:scale-95 transition-transform">
+                    Set Goal
+                </a>
+            </div>
+        );
+    }
+
 
     if (loading) {
         return (
