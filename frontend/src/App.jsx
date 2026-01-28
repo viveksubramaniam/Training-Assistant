@@ -32,6 +32,7 @@ const LoginScreen = () => {
           <span className="font-bold">Connect with Strava</span>
         </a>
         <p className="mt-8 text-[10px] text-white/20 uppercase tracking-widest font-bold">Version 2.0.1 (Alpha)</p>
+        <p className="mt-2 text-[10px] text-red-500 font-mono">DEBUG API: '{API_BASE_URL}'</p>
       </div>
     </div>
   );
