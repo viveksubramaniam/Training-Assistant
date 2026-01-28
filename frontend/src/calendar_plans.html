@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Eclipse Performance AI | Training Calendar</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f97415",
+                        "background-light": "#f8f7f5",
+                        "background-dark": "#0F172A",
+                        "cosmic-indigo": "#334155",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .active-day-glow {
+            box-shadow: 0 0 15px rgba(249, 116, 21, 0.2);
+            border: 1px solid #f97415;
+        }
+
+        .telemetry-line {
+            stroke: #f97415;
+            stroke-dasharray: 4;
+            opacity: 0.3;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white min-h-screen overflow-x-hidden">
+    <div class="flex flex-col h-screen">
+        <!-- Top Navigation -->
+        <header
+            class="flex items-center justify-between border-b border-white/10 px-8 py-3 glass-panel sticky top-0 z-50">
+            <div class="flex items-center gap-8">
+                <div class="flex items-center gap-3 text-white">
+                    <div class="size-8 bg-primary rounded-lg flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white">shadow</span>
+                    </div>
+                    <h2 class="text-xl font-bold leading-tight tracking-tight">Eclipse AI</h2>
+                </div>
+                <nav class="flex items-center gap-6">
+                    <a class="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                        href="#">Dashboard</a>
+                    <a class="text-white text-sm font-bold border-b-2 border-primary pb-1" href="#">Training Plan</a>
+                    <a class="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                        href="#">Analysis</a>
+                    <a class="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                        href="#">Community</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="relative group">
+                    <span
+                        class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input
+                        class="bg-slate-800/50 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-1 focus:ring-primary w-64 text-white placeholder:text-slate-500"
+                        placeholder="Search data..." />
+                </div>
+                <div class="flex gap-3">
+                    <button
+                        class="size-10 rounded-lg glass-panel flex items-center justify-center hover:bg-slate-700 transition-colors">
+                        <span class="material-symbols-outlined text-slate-300">settings</span>
+                    </button>
+                    <button
+                        class="size-10 rounded-lg glass-panel flex items-center justify-center hover:bg-slate-700 transition-colors relative">
+                        <span class="material-symbols-outlined text-slate-300">notifications</span>
+                        <span class="absolute top-2 right-2 size-2 bg-primary rounded-full"></span>
+                    </button>
+                </div>
+                <div class="size-10 rounded-full border-2 border-primary/50 overflow-hidden">
+                    <img alt="Profile" class="w-full h-full object-cover" data-alt="User profile marathon runner"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQL-Mj6fjSr2P1HVUwUNaErwBUh8MSdmNrg0RkYau0xuVnUiYISRGUe-0ovrvKTlGUpa409xU58NVCatCytjZjgm2X62znozKrE1M55LNG1Xu4c3Oald4mO5AclwWHbXhlCzbI6adnW-l5kGcJLnx1xa8OizbRyY_HTEmpIzA-A-jBKPFMa19i26RwGDvwUIKXpZzMjoNpM7lsyYTo5qX8YH4ZSLZlAAI0jN5xv-8UTlC7JGDEc7BnXbdx477X7KMVnwB7JgHdGsk" />
+                </div>
+            </div>
+        </header>
+        <main class="flex flex-1 overflow-hidden">
+            <!-- Main Content Area -->
+            <div class="flex-1 flex flex-col p-6 gap-6 overflow-y-auto hide-scrollbar">
+                <!-- Breadcrumbs & Heading -->
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2 text-slate-400 text-xs font-medium uppercase tracking-widest">
+                        <span>Training Block</span>
+                        <span class="material-symbols-outlined text-[10px]">chevron_right</span>
+                        <span class="text-primary">Phase 2: Aerobic Power</span>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <h1 class="text-4xl font-black text-white tracking-tight">Immersive Training Calendar</h1>
+                            <p class="text-slate-400 mt-1">12-Week Marathon Prep Block • Week 4 of 12</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button
+                                class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-all border border-white/5">
+                                Export PDF
+                            </button>
+                            <button
+                                class="px-6 py-2 bg-primary hover:bg-orange-600 rounded-lg text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all">
+                                Log Daily Stats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Calendar View Tabs -->
+                <div class="flex border-b border-white/10 gap-8">
+                    <button class="text-slate-400 text-sm font-bold pb-3 hover:text-white">Month View</button>
+                    <button class="text-white text-sm font-bold border-b-2 border-primary pb-3">Detailed Week</button>
+                    <button class="text-slate-400 text-sm font-bold pb-3 hover:text-white">Training Phases</button>
+                </div>
+                <!-- Calendar Grid Container -->
+                <div class="flex flex-col gap-4 relative">
+                    <!-- Past Week (Condensed) -->
+                    <div class="glass-panel rounded-xl h-14 flex items-center px-6 opacity-60">
+                        <div class="flex-1 flex items-center gap-4">
+                            <span class="text-xs font-mono text-slate-500">WEEK 03</span>
+                            <div class="h-1 w-full bg-slate-700 rounded-full overflow-hidden">
+                                <div class="bg-emerald-500 h-full w-[95%]"></div>
+                            </div>
+                        </div>
+                        <div class="ml-10 text-xs font-bold text-slate-400 uppercase tracking-widest">Base Building II
+                            Completed</div>
+                    </div>
+                    <!-- Current Week (Expanded) -->
+                    <div class="grid grid-cols-7 gap-4 h-[420px]">
+                        <!-- Day 1: Monday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">MON 14</span>
+                                <span class="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">Recovery
+                                </p>
+                                <h4 class="font-bold text-sm leading-tight">Active Recovery Run</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-white tracking-tighter">6.0<span
+                                        class="text-xs ml-1 text-slate-500">KM</span></div>
+                                <div class="mt-1 font-mono text-xs text-slate-400">Pace: 5:45/km</div>
+                            </div>
+                            <div class="pt-4 border-t border-white/5">
+                                <div class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-orange-400 text-xs">bolt</span>
+                                    <span class="text-[10px] text-slate-400">RPE: 3/10</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Day 2: Tuesday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all active-day-glow">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-primary font-bold">TUE 15</span>
+                                <span class="size-2 bg-primary rounded-full animate-pulse"></span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">Intervals
+                                </p>
+                                <h4 class="font-bold text-sm leading-tight">8 x 800m V02 Max</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-white tracking-tighter">12.4<span
+                                        class="text-xs ml-1 text-slate-500">KM</span></div>
+                                <div class="mt-1 font-mono text-xs text-orange-400">Target: 3:45/km</div>
+                            </div>
+                            <div class="pt-4 border-t border-white/5">
+                                <div class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-primary text-xs">auto_awesome</span>
+                                    <span class="text-[10px] text-white">Focus: Leg Turnover</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Day 3: Wednesday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all opacity-80">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">WED 16</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mb-1">Rest</p>
+                                <h4 class="font-bold text-sm leading-tight">Full Body Mobility</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-slate-600 tracking-tighter">--<span
+                                        class="text-xs ml-1">MIN</span></div>
+                            </div>
+                        </div>
+                        <!-- Day 4: Thursday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">THU 17</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">Threshold
+                                </p>
+                                <h4 class="font-bold text-sm leading-tight">12km Steady State</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-white tracking-tighter">15.0<span
+                                        class="text-xs ml-1 text-slate-500">KM</span></div>
+                                <div class="mt-1 font-mono text-xs text-slate-400">Target: 4:15/km</div>
+                            </div>
+                        </div>
+                        <!-- Day 5: Friday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">FRI 18</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">Easy</p>
+                                <h4 class="font-bold text-sm leading-tight">Base Aerobic Run</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-white tracking-tighter">8.0<span
+                                        class="text-xs ml-1 text-slate-500">KM</span></div>
+                            </div>
+                        </div>
+                        <!-- Day 6: Saturday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">SAT 19</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">Long Run
+                                </p>
+                                <h4 class="font-bold text-sm leading-tight">Endurance Block</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-white tracking-tighter">22.0<span
+                                        class="text-xs ml-1 text-slate-500">KM</span></div>
+                            </div>
+                        </div>
+                        <!-- Day 7: Sunday -->
+                        <div
+                            class="glass-panel rounded-xl p-4 flex flex-col gap-4 group hover:bg-slate-800/80 transition-all opacity-80">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-mono text-slate-500">SUN 20</span>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mb-1">Rest</p>
+                                <h4 class="font-bold text-sm leading-tight">Optional Stretch</h4>
+                                <div class="mt-4 font-mono text-xl font-bold text-slate-600 tracking-tighter">--<span
+                                        class="text-xs ml-1">KM</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Future Weeks (Condensed Bars) -->
+                    <div class="flex flex-col gap-3">
+                        <div
+                            class="h-14 bg-cosmic-indigo/40 border border-white/5 rounded-xl flex items-center px-6 group cursor-pointer hover:bg-cosmic-indigo/60 transition-all">
+                            <span class="text-xs font-mono text-slate-500 w-20">WEEK 05</span>
+                            <div class="flex-1 font-bold text-xs text-slate-300 uppercase tracking-widest text-center">
+                                VO2 Max Block - Peak Intensity</div>
+                            <div class="w-20 text-right"><span
+                                    class="material-symbols-outlined text-slate-500 group-hover:text-white transition-colors">unfold_more</span>
+                            </div>
+                        </div>
+                        <div
+                            class="h-14 bg-cosmic-indigo/40 border border-white/5 rounded-xl flex items-center px-6 group cursor-pointer hover:bg-cosmic-indigo/60 transition-all">
+                            <span class="text-xs font-mono text-slate-500 w-20">WEEK 06</span>
+                            <div class="flex-1 font-bold text-xs text-slate-300 uppercase tracking-widest text-center">
+                                VO2 Max Block - Peak Intensity</div>
+                            <div class="w-20 text-right"><span
+                                    class="material-symbols-outlined text-slate-500 group-hover:text-white transition-colors">unfold_more</span>
+                            </div>
+                        </div>
+                        <div
+                            class="h-14 bg-slate-900/50 border border-dashed border-white/10 rounded-xl flex items-center px-6 group">
+                            <span class="text-xs font-mono text-slate-600 w-20">WEEK 07</span>
+                            <div class="flex-1 font-bold text-xs text-slate-600 uppercase tracking-widest text-center">
+                                Recovery &amp; Taper Prep</div>
+                        </div>
+                    </div>
+                    <!-- Telemetry Line SVG (Decorative) -->
+                    <svg class="absolute top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-visible">
+                        <path class="telemetry-line" d="M 50 200 Q 300 150 600 250 T 1200 200" fill="none"></path>
+                    </svg>
+                </div>
+            </div>
+            <!-- Right Sidebar: Workout Plan Overview -->
+            <aside class="w-80 glass-panel border-l border-white/10 p-6 flex flex-col gap-8">
+                <!-- Progress Tracker -->
+                <div class="flex flex-col gap-4">
+                    <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400">Plan Progress</h3>
+                    <div class="relative pt-1">
+                        <div class="flex mb-2 items-center justify-between">
+                            <div>
+                                <span
+                                    class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/20">
+                                    In Progress
+                                </span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs font-mono font-bold inline-block text-primary">
+                                    65%
+                                </span>
+                            </div>
+                        </div>
+                        <div class="overflow-hidden h-1.5 mb-4 text-xs flex rounded bg-slate-800">
+                            <div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
+                                style="width:65%"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Volume Chart (Planned vs Actual) -->
+                <div class="flex flex-col gap-4">
+                    <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400">Weekly Volume</h3>
+                    <div class="h-32 flex items-end gap-2 px-2 border-b border-white/10">
+                        <div class="flex-1 bg-slate-800/50 h-[40%] rounded-t-sm relative group">
+                            <div class="absolute inset-x-0 bottom-0 bg-primary/40 h-[80%] rounded-t-sm"></div>
+                        </div>
+                        <div class="flex-1 bg-slate-800/50 h-[55%] rounded-t-sm relative">
+                            <div class="absolute inset-x-0 bottom-0 bg-primary/40 h-[90%] rounded-t-sm"></div>
+                        </div>
+                        <div class="flex-1 bg-slate-800/50 h-[65%] rounded-t-sm relative">
+                            <div class="absolute inset-x-0 bottom-0 bg-primary/40 h-[95%] rounded-t-sm"></div>
+                        </div>
+                        <div class="flex-1 bg-slate-800/50 h-[80%] rounded-t-sm relative">
+                            <div class="absolute inset-x-0 bottom-0 bg-primary h-[20%] rounded-t-sm"></div>
+                        </div>
+                        <div class="flex-1 bg-slate-800/50 h-[70%] rounded-t-sm"></div>
+                        <div class="flex-1 bg-slate-800/50 h-[90%] rounded-t-sm"></div>
+                    </div>
+                    <div class="flex justify-between font-mono text-[10px] text-slate-500">
+                        <span>W3</span>
+                        <span class="text-primary font-bold">W4 (ACTIVE)</span>
+                        <span>W5</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Planned</p>
+                            <p class="font-mono text-lg font-bold">62.5<span class="text-xs ml-1">km</span></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Actual</p>
+                            <p class="font-mono text-lg font-bold text-primary">12.4<span class="text-xs ml-1">km</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <!-- AI Coach's Note -->
+                <div
+                    class="mt-auto bg-primary/10 rounded-xl p-5 border border-primary/20 relative overflow-hidden group">
+                    <div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <span class="material-symbols-outlined text-8xl text-primary">auto_awesome</span>
+                    </div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-outlined text-primary text-xl">colors_spark</span>
+                        <h4 class="text-sm font-bold text-white uppercase tracking-tight">Coach's Insight</h4>
+                    </div>
+                    <p class="text-sm text-slate-300 leading-relaxed italic">
+                        "Your HRV recovery score is at 84% — optimal for today's V02 Max session. Focus on high cadence
+                        (180+ spm) during the 800m repeats. You're tracking 3% ahead of your sub-3:30 marathon target
+                        pace."
+                    </p>
+                    <button class="mt-4 text-xs font-bold text-primary flex items-center gap-1 hover:underline">
+                        Detailed Readiness Report <span class="material-symbols-outlined text-xs">arrow_forward</span>
+                    </button>
+                </div>
+            </aside>
+        </main>
+    </div>
+</body>
+
+</html>
