@@ -60,7 +60,8 @@ router.get('/callback', async (req, res) => {
         req.session.stravaId = athlete.id;
         console.log('Session set:', req.session.stravaId);
 
-        res.redirect('http://localhost:5173'); // Redirect back to frontend
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(frontendUrl); // Redirect back to frontend
     } catch (error) {
         console.error('Error in callback:', error.response?.data || error.message);
         console.error('Full Error Object:', JSON.stringify(error, null, 2));
