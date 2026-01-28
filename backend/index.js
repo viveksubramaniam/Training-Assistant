@@ -37,10 +37,13 @@ app.use(cors({
 
 app.use(express.json());
 
+app.set('trust proxy', 1); // Trust first proxy (Railway load balancer)
 app.use(cookieSession({
     name: 'session',
     keys: [process.env.SESSION_SECRET || 'secret_key'],
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: process.env.NODE_ENV === 'production', // Secure in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
 }));
 
 // Mount routes
