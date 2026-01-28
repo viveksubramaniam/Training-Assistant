@@ -17,6 +17,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+});
 
 console.log('------------------------------------------------');
 console.log(`Starting Server... Time: ${new Date().toISOString()}`);
@@ -25,7 +28,7 @@ console.log('------------------------------------------------');
 // CORS configuration for web and mobile clients
 const CORS_ORIGINS = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : ['http://localhost:5173', 'http://localhost:3000', 'https://vivek-training-asst.vercel.app'];
 
 app.use(cors({
     origin: CORS_ORIGINS,
