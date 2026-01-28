@@ -59,7 +59,9 @@ const triggerOrchestration = async (userId) => {
             type: a.sport_type
         }));
 
-        console.log(`[Async] Calling AI service...`);
+        console.log(`[Async] Calling AI service at: ${AI_SERVICE_URL}/orchestrate`);
+        console.log(`[Async] Payload userId: ${userId}, Goal: ${goal.goal_type}`);
+
         const response = await axios.post(`${AI_SERVICE_URL}/orchestrate`, {
             userId: String(userId),
             goal: {
@@ -71,7 +73,7 @@ const triggerOrchestration = async (userId) => {
             weeklyPlan: cachedWeekly,
             recentActivities: activitiesSummary,
             forceRegenerate: false
-        }, { timeout: 120000 }); // Longer timeout for background process
+        }, { timeout: 120000 });
 
         // Check if result is wrapped in 'result' key (from prepare_result node)
         // or available at root (snake_case from state)
@@ -144,6 +146,7 @@ const triggerOrchestration = async (userId) => {
  * Triggers background plan generation if needed
  */
 router.post('/sync', requireAuth, async (req, res) => {
+    console.log(`[Sync] Received sync request for User ${req.userId}`); // verification log
     const userId = req.userId;
     const today = new Date().toISOString().split('T')[0];
     const weekStart = getWeekStart();
