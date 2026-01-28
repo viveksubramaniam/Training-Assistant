@@ -56,16 +56,37 @@ const App = () => {
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
+      // Check for token in URL (redirect from login)
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get('token');
+
+      if (tokenFromUrl) {
+        localStorage.setItem('authToken', tokenFromUrl);
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      const token = localStorage.getItem('authToken');
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
+        const headers = { 'Authorization': `Bearer ${token}` };
+
         const [userRes, activitiesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/user`, { credentials: 'include' }),
-          fetch(`${API_BASE_URL}/api/activities`, { credentials: 'include' })
+          fetch(`${API_BASE_URL}/api/user`, { headers }),
+          fetch(`${API_BASE_URL}/api/activities`, { headers })
         ]);
 
         if (userRes.ok) {
           const userData = await userRes.json();
           setUser(userData);
         } else {
+          // Token invalid or expired
+          localStorage.removeItem('authToken');
           setUser(null);
         }
 
@@ -87,16 +108,23 @@ const App = () => {
 
   const handleSync = async () => {
     setSyncing(true);
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/activities/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullSync: false }),
-        credentials: 'include'
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ fullSync: false })
       });
       if (res.ok) {
         // Refresh activities
-        const actRes = await fetch(`${API_BASE_URL}/api/activities`, { credentials: 'include' });
+        const actRes = await fetch(`${API_BASE_URL}/api/activities`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (actRes.ok) setActivities(await actRes.json());
       }
     } catch (err) {

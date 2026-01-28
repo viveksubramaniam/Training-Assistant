@@ -1,5 +1,6 @@
 import express from 'express';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import * as db from '../db/index.js';
 import { STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, STRAVA_REDIRECT_URI, STRAVA_SCOPES } from '../config/strava.js';
 
@@ -56,12 +57,18 @@ router.get('/callback', async (req, res) => {
 
         await db.saveUser(user);
 
-        // Set session
-        req.session.stravaId = athlete.id;
-        console.log('Session set:', req.session.stravaId);
+        // Generate JWT
+
+        const token = jwt.sign(
+            { stravaId: athlete.id, name: user.name },
+            process.env.SESSION_SECRET || 'secret_key',
+            { expiresIn: '24h' }
+        );
+
+        console.log('JWT Generated for:', athlete.id);
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(frontendUrl); // Redirect back to frontend
+        res.redirect(`${frontendUrl}?token=${token}`);
     } catch (error) {
         console.error('Error in callback:', error.response?.data || error.message);
         console.error('Full Error Object:', JSON.stringify(error, null, 2));
@@ -74,21 +81,32 @@ router.get('/callback', async (req, res) => {
  * Get current authenticated user info
  */
 router.get('/user', async (req, res) => {
-    console.log('[GET] /api/user - Fetching session');
+    console.log('[GET] /api/user - Verifying Token');
 
-    if (!req.session.stravaId) {
-        console.log('No active session');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log('No token provided');
         return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await db.getUser(req.session.stravaId);
-    if (!user) {
-        console.log('User not found in DB for session:', req.session.stravaId);
-        return res.status(404).json({ error: 'User not found' });
-    }
+    const token = authHeader.split(' ')[1];
 
-    console.log('User session found:', user.name);
-    res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime });
+    try {
+
+        const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'secret_key');
+
+        const user = await db.getUser(decoded.stravaId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('User authenticated:', user.name);
+        res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime });
+
+    } catch (err) {
+        console.error('Invalid Token:', err.message);
+        return res.status(401).json({ error: 'Invalid token' });
+    }
 });
 
 /**
