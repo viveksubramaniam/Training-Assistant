@@ -6,7 +6,11 @@
     "type": "module",
     "scripts": {
         "start": "node index.js",
-        "dev": "nodemon index.js"
+        "dev": "nodemon index.js",
+        "build": "echo 'No build step for backend'"
+    },
+    "engines": {
+        "node": "20.x"
     },
     "dependencies": {
         "cookie-session": "^2.1.0",
