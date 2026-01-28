@@ -23,6 +23,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 console.log('------------------------------------------------');
 console.log(`Starting Server... Time: ${new Date().toISOString()}`);
+console.log(`Environment: ${process.env.NODE_ENV}`);
+console.log(`Cookie Config: Secure=${process.env.NODE_ENV === 'production'}, SameSite=${process.env.NODE_ENV === 'production' ? 'none' : 'lax'}`);
 console.log('------------------------------------------------');
 
 // CORS configuration for web and mobile clients
