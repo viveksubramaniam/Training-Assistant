@@ -24,7 +24,10 @@ const CalendarPage = () => {
             try {
                 if (isMounted && !weeklyPlan && !isPolling) setLoading(true);
 
-                const masterRes = await fetch(`${API_BASE_URL}/api/coach/master-plan`);
+                const token = localStorage.getItem('authToken');
+                const headers = { 'Authorization': `Bearer ${token}` };
+
+                const masterRes = await fetch(`${API_BASE_URL}/api/coach/master-plan`, { headers });
                 const masterData = await masterRes.json();
 
                 // Handle No Goal case
@@ -38,7 +41,7 @@ const CalendarPage = () => {
 
                 if (isMounted && masterData && !masterData.error) setMasterPlan(masterData);
 
-                const weeklyRes = await fetch(`${API_BASE_URL}/api/coach/weekly-plan`);
+                const weeklyRes = await fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers });
                 const weeklyData = await weeklyRes.json();
 
                 if (isMounted) {
@@ -59,7 +62,10 @@ const CalendarPage = () => {
                     if (!hasTriggeredSync.current) {
                         console.log("Plans missing (Master: " + masterMissing + ", Weekly: " + weeklyMissing + "), triggering sync...");
                         hasTriggeredSync.current = true;
-                        await fetch(`${API_BASE_URL}/api/coach/sync`, { method: 'POST' });
+                        await fetch(`${API_BASE_URL}/api/coach/sync`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+                        });
                     }
                 }
 

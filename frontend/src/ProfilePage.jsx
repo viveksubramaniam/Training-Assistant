@@ -14,7 +14,10 @@ const ProfilePage = ({ user, activities }) => {
     useEffect(() => {
         const fetchGoal = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/goals`, { credentials: 'include' });
+                const token = localStorage.getItem('authToken');
+                const res = await fetch(`${API_BASE_URL}/api/goals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.hasGoal && data.goal) {
@@ -87,11 +90,14 @@ const ProfilePage = ({ user, activities }) => {
             // Check if we have an existing goal to update or create new
             const method = currentGoal?.id ? 'PUT' : 'POST';
             const url = currentGoal?.id ? `${API_BASE_URL}/api/goals/${currentGoal.id}` : `${API_BASE_URL}/api/goals`;
+            const token = localStorage.getItem('authToken');
 
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(goalPayload)
             });
 
@@ -105,8 +111,10 @@ const ProfilePage = ({ user, activities }) => {
                     console.log('Triggering plan regeneration...');
                     const regenerateRes = await fetch(`${API_BASE_URL}/api/coach/regenerate`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include'
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
                     });
 
                     if (regenerateRes.ok) {

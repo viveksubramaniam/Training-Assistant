@@ -14,7 +14,10 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
         const startProcess = async () => {
             try {
                 // Check if we already have the plan
-                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`);
+                const token = localStorage.getItem('authToken');
+                const headers = { 'Authorization': `Bearer ${token}` };
+
+                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers });
                 const data = await response.json();
 
                 if (data.status === 'generating' || data.status === 'syncing') {
@@ -22,7 +25,10 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                     if (!hasTriggeredSync.current) {
                         hasTriggeredSync.current = true;
                         console.log("Plan missing/generating, triggering sync...");
-                        await fetch(`${API_BASE_URL}/api/coach/sync`, { method: 'POST' });
+                        await fetch(`${API_BASE_URL}/api/coach/sync`, {
+                            method: 'POST',
+                            headers
+                        });
                     }
                     // Start polling
                     pollData();
@@ -132,7 +138,10 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
             if (!isMounted) return;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`);
+                const token = localStorage.getItem('authToken');
+                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const data = await response.json();
 
                 if (!isMounted) return;
