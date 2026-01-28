@@ -46,6 +46,15 @@ app.use(cookieSession({
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
 }));
 
+// Debug Middleware
+app.use((req, res, next) => {
+    console.log(`[${req.method}] ${req.path}`);
+    console.log('Origin:', req.headers.origin);
+    console.log('Session:', req.session);
+    // console.log('Cookies:', req.headers.cookie); // Optional: verbose
+    next();
+});
+
 // Mount routes
 app.use('/api/auth/strava', stravaRoutes);
 app.use('/api', stravaRoutes); // For /api/user endpoint
