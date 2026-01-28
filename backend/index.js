@@ -50,10 +50,6 @@ app.use(cookieSession({
 
 // Debug Middleware
 app.use((req, res, next) => {
-    console.log(`[${req.method}] ${req.path}`);
-    console.log('Origin:', req.headers.origin);
-    console.log('Session:', req.session);
-    // console.log('Cookies:', req.headers.cookie); // Optional: verbose
     next();
 });
 
