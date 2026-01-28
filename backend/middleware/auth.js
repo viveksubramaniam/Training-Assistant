@@ -1,4 +1,5 @@
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import * as db from '../db/index.js';
 import { STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET } from '../config/strava.js';
 
@@ -57,26 +58,47 @@ export const ensureValidToken = async (user) => {
  * Middleware: Require authenticated session
  */
 export const requireAuth = (req, res, next) => {
-    if (!req.session.stravaId) {
-        return res.status(401).json({ error: 'Not authenticated' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
     }
-    next();
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'secret_key');
+        req.session = req.session || {}; // Polyfill if needed
+        req.session.stravaId = decoded.stravaId; // Backwards compatibility
+        req.userId = decoded.stravaId; // New standard
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
 };
 
 /**
  * Middleware: Get authenticated user from database
  */
 export const getAuthenticatedUser = async (req, res, next) => {
-    if (!req.session.stravaId) {
-        return res.status(401).json({ error: 'Not authenticated' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const user = db.getUser(req.session.stravaId);
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'secret_key');
+        const user = db.getUser(decoded.stravaId);
 
-    // Attach user to request
-    req.user = user;
-    next();
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        req.user = user;
+        req.session = req.session || {};
+        req.session.stravaId = decoded.stravaId;
+        req.userId = decoded.stravaId;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
 };

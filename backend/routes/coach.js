@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import * as db from '../db/index.js';
 
 const router = Router();
@@ -22,10 +23,19 @@ const getWeekStart = () => {
 
 // Auth middleware
 const requireAuth = (req, res, next) => {
-    if (!req.session?.stravaId) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
     }
-    next();
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'secret_key');
+        req.userId = decoded.stravaId; // Attach to request
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
 };
 
 
@@ -134,7 +144,7 @@ const triggerOrchestration = async (userId) => {
  * Triggers background plan generation if needed
  */
 router.post('/sync', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     const today = new Date().toISOString().split('T')[0];
     const weekStart = getWeekStart();
 
@@ -174,7 +184,7 @@ router.post('/sync', requireAuth, async (req, res) => {
  * Force regenerate all plans after goal change
  */
 router.post('/regenerate', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     console.log(`[Regenerate] Force regenerating plans for user ${userId}`);
 
     try {
@@ -269,7 +279,7 @@ router.post('/regenerate', requireAuth, async (req, res) => {
  * Returns daily workout (Non-blocking)
  */
 router.get('/daily-plan', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     const today = new Date().toISOString().split('T')[0];
 
     try {
@@ -301,7 +311,7 @@ router.get('/daily-plan', requireAuth, async (req, res) => {
  * Returns weekly plan (Non-blocking)
  */
 router.get('/weekly-plan', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     const weekStart = getWeekStart();
 
     try {
@@ -327,7 +337,7 @@ router.get('/weekly-plan', requireAuth, async (req, res) => {
  * Returns full master plan for visualization
  */
 router.get('/master-plan', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     console.log(`[MasterPlan] Fetching for user ${userId}`);
 
     try {
@@ -357,7 +367,7 @@ router.get('/master-plan', requireAuth, async (req, res) => {
  * GET /api/coach/streak
  */
 router.get('/streak', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
 
     try {
         const streak = await db.calculateStreak(userId);

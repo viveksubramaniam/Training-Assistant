@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import * as db from '../db/index.js';
 
 const router = Router();
@@ -14,10 +15,19 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5001';
 
 // Auth middleware
 const requireAuth = (req, res, next) => {
-    if (!req.session?.stravaId) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
     }
-    next();
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'secret_key');
+        req.userId = decoded.stravaId; // Attach to request
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
 };
 
 /**
@@ -25,7 +35,7 @@ const requireAuth = (req, res, next) => {
  * Get user's active goal
  */
 router.get('/', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
 
     try {
         const goal = await db.getActiveGoal(userId);
@@ -66,7 +76,7 @@ router.get('/', requireAuth, async (req, res) => {
  * Create new goal - master plan will be generated via /orchestrate on next load
  */
 router.post('/', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     const { goalType, targetDate, weeklyTarget, preferredDays } = req.body;
 
     console.log(`POST /api/goals - userId: ${userId}, goalType: ${goalType}`);
@@ -118,7 +128,7 @@ router.post('/', requireAuth, async (req, res) => {
  * Update existing goal - clears caches, plan regenerates on next load
  */
 router.put('/:id', requireAuth, async (req, res) => {
-    const userId = req.session.stravaId;
+    const userId = req.userId;
     const goalId = req.params.id;
     const { goalType, targetDate, weeklyTarget, preferredDays } = req.body;
 
