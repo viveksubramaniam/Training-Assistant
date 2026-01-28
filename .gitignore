@@ -38,4 +38,4 @@ yarn-debug.log*
 yarn-error.log*
 
 # Python Venv
-server/ai_service/ai_service
+server/ai_service/venv
