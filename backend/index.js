@@ -50,7 +50,3 @@ app.use('/api/activities', activitiesRoutes);  // For /api/activities, /api/acti
 app.use('/api/activities', analysisRoutes);
 app.use('/api/coach', coachRoutes);
 app.use('/api/goals', goalsRoutes);
-
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
