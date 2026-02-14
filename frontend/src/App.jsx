@@ -4,15 +4,37 @@ import CalendarPage from './CalendarPage';
 import ProfilePage from './ProfilePage';
 import ActivityDetailPage from './ActivityDetailPage';
 import ChatWidget from './components/ChatWidget';
-import { Clock, RefreshCw, Zap, Award, Activity } from 'lucide-react';
+import { Clock, RefreshCw, Zap, Award, Activity, Eye } from 'lucide-react';
 import { API_BASE_URL } from './config/api';
 
 import StravaLoginButton from './components/LoginButton';
+
+const DEMO_USER_ID = 999999999;
 
 /* -------------------------------------------------------------------------- */
 /*                                Login Screen                                */
 /* -------------------------------------------------------------------------- */
 const LoginScreen = () => {
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/strava/demo-login`, { method: 'POST' });
+      if (res.ok) {
+        const { token } = await res.json();
+        localStorage.setItem('authToken', token);
+        window.location.reload();
+      } else {
+        console.error('Demo login failed');
+        setDemoLoading(false);
+      }
+    } catch (err) {
+      console.error('Demo login error:', err);
+      setDemoLoading(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-background-dark relative overflow-hidden font-display">
       {/* Background Gradients */}
@@ -27,6 +49,16 @@ const LoginScreen = () => {
         <p className="text-slate-400 mb-12 text-lg font-medium">Your adaptive performance coach.</p>
 
         <StravaLoginButton onLogin={() => window.location.href = `${API_BASE_URL}/api/auth/strava/login`} />
+
+        {/* Demo Login Button */}
+        <button
+          onClick={handleDemoLogin}
+          disabled={demoLoading}
+          className="mt-5 flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/60 text-sm font-medium hover:bg-white/10 hover:text-white hover:border-white/20 transition-all duration-300 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Eye className="w-4 h-4" />
+          {demoLoading ? 'Loading demo...' : 'Try Demo Account'}
+        </button>
 
         <p className="mt-8 text-[10px] text-white/20 uppercase tracking-widest font-bold">Version 2.0.1 (Alpha)</p>
       </div>
@@ -102,7 +134,10 @@ const App = () => {
     fetchInitialData();
   }, []);
 
+  const isDemo = user?.isDemo || false;
+
   const handleSync = async () => {
+    if (isDemo) return; // Demo mode — sync disabled
     setSyncing(true);
     const token = localStorage.getItem('authToken');
     if (!token) return;
@@ -184,13 +219,15 @@ const App = () => {
             <div className="h-full overflow-y-auto hide-scrollbar pb-20 p-4">
               <div className="flex items-center justify-between mb-4 pt-4">
                 <h1 className="text-2xl font-bold uppercase tracking-tight">Activity Log</h1>
-                <button
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <RefreshCw className={`w-5 h-5 text-primary ${syncing ? 'animate-spin' : ''}`} />
-                </button>
+                {!isDemo && (
+                  <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <RefreshCw className={`w-5 h-5 text-primary ${syncing ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
               </div>
 
               {/* Filter Bubbles */}
@@ -291,6 +328,7 @@ const App = () => {
             <button
               onClick={() => setShowChat(!showChat)}
               className="w-11 h-11 rounded-full bg-primary/10 backdrop-blur-md flex items-center justify-center border border-primary/50 shadow-[0_0_15px_rgba(249,116,21,0.3)] hover:bg-primary/20 hover:scale-105 transition-all text-primary"
+              title="Chat with AI Coach"
             >
               <span className="material-symbols-outlined text-[24px]">psychology</span>
             </button>
