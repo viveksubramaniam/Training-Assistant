@@ -24,6 +24,11 @@ router.get('/', requireAuth, async (req, res) => {
  * Sync activities from Strava
  */
 router.post('/sync', requireAuth, async (req, res) => {
+    // Block sync for demo user (read-only mode)
+    if (req.session.stravaId === 999999999) {
+        return res.json({ success: true, count: 0, total: 0, message: 'Demo mode — sync disabled.' });
+    }
+
     const user = await db.getUser(req.session.stravaId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -148,6 +153,14 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     if (cachedActivity && cachedActivity.hasDetailedData && !isCacheValid) {
         console.log(`Cached data for activity ${activityId} is incomplete/corrupted. Forcing re-fetch.`);
+    }
+
+    // Demo user: return whatever we have in the DB (no Strava API access)
+    if (userId === 999999999) {
+        if (cachedActivity) {
+            return res.json(cachedActivity);
+        }
+        return res.status(404).json({ error: 'Activity not found in demo data.' });
     }
 
     // Not in cache or not detailed - fetch from Strava

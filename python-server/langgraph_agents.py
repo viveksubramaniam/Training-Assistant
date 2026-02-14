@@ -116,7 +116,7 @@ def parse_json_response(response: str) -> dict:
     """Extract and parse JSON from LLM response."""
     import re
     # 1. Try to find markdown code block
-    json_match = re.search(r'```json\s*(.*?)```, response, re.DOTALL)
+    json_match = re.search(r'```json\s*(.*?)```', response, re.DOTALL)
     if json_match:
         return json.loads(json_match.group(1))
     

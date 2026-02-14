@@ -77,6 +77,34 @@ router.get('/callback', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/demo-login
+ * Log in as the pre-seeded demo user (no Strava OAuth needed)
+ */
+router.post('/demo-login', async (req, res) => {
+    const DEMO_STRAVA_ID = 999999999;
+    console.log('[POST] /api/auth/demo-login - Demo login requested');
+
+    try {
+        const user = await db.getUser(DEMO_STRAVA_ID);
+        if (!user) {
+            return res.status(500).json({ error: 'Demo user not found. Please run the seed script first.' });
+        }
+
+        const token = jwt.sign(
+            { stravaId: DEMO_STRAVA_ID, name: user.name, isDemo: true },
+            process.env.SESSION_SECRET || 'secret_key',
+            { expiresIn: '24h' }
+        );
+
+        console.log('Demo JWT generated for:', user.name);
+        res.json({ token });
+    } catch (error) {
+        console.error('Demo login failed:', error.message);
+        res.status(500).json({ error: 'Demo login failed' });
+    }
+});
+
+/**
  * GET /api/user
  * Get current authenticated user info
  */
@@ -103,7 +131,8 @@ router.get('/user', async (req, res) => {
         const streak = await db.calculateStreak(user.stravaId);
 
         console.log('User authenticated:', user.name);
-        res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime, streak });
+        const isDemo = decoded.isDemo || false;
+        res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime, streak, isDemo });
 
     } catch (err) {
         console.error('Invalid Token:', err.message);
