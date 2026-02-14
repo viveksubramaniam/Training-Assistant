@@ -179,6 +179,20 @@ export const deactivateUserGoals = adapter.deactivateUserGoals;
 export const deleteGoal = adapter.deleteGoal;
 
 /**
+ * Mark goal as completed
+ * @param {string} goalId - Goal ID
+ * @returns {Promise<Object>} Completed goal
+ */
+export const completeGoal = adapter.completeGoal;
+
+/**
+ * Get goal history
+ * @param {string} userId - User ID
+ * @returns {Promise<Array>} List of completed goals
+ */
+export const getGoalHistory = adapter.getGoalHistory;
+
+/**
  * Get master plan for a goal
  * @param {string} goalId - Goal ID
  * @returns {Promise<Object|null>} Master plan or null

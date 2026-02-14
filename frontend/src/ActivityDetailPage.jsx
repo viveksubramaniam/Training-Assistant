@@ -29,10 +29,22 @@ const ActivityDetailPage = ({ activity, onClose }) => {
         const fetchData = async () => {
             console.log('[ActivityDetailPage] Fetching details for activity:', activity.id);
             try {
+                const token = localStorage.getItem('authToken');
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+
                 // Fetch activity details and AI summary in parallel
                 const [detailsRes, summaryRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/activities/${activity.id}`, { credentials: 'include' }),
-                    fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, { credentials: 'include' }).catch(() => null)
+                    fetch(`${API_BASE_URL}/api/activities/${activity.id}`, {
+                        headers,
+                        credentials: 'include'
+                    }),
+                    fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, {
+                        headers,
+                        credentials: 'include'
+                    }).catch(() => null)
                 ]);
 
                 console.log('[ActivityDetailPage] API Response status:', detailsRes.status);

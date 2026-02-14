@@ -587,17 +587,18 @@ export const createGoal = async (userId, data) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Deactivate ALL existing goals for this user
-        await client.query(`
+        // 1. Archive ALL non-completed goals for this user (Active, Archived, or older)
+        const archiveResult = await client.query(`
             UPDATE user_goals 
-            SET is_active = FALSE 
-            WHERE user_id = $1
+            SET is_active = FALSE, status = 'ARCHIVED' 
+            WHERE user_id = $1 AND status IS DISTINCT FROM 'COMPLETED'
         `, [userId]);
+        console.log(`[createGoal] Archived ${archiveResult.rowCount} existing active goals for user ${userId}`);
 
         // 2. Create the new ACTIVE goal
         const result = await client.query(`
-            INSERT INTO user_goals (user_id, goal_type, target_date, weekly_target_distance, preferred_workout_days, is_active)
-            VALUES ($1, $2, $3, $4, $5, TRUE)
+            INSERT INTO user_goals (user_id, goal_type, target_date, weekly_target_distance, preferred_workout_days, is_active, status)
+            VALUES ($1, $2, $3, $4, $5, TRUE, 'ACTIVE')
             RETURNING *
         `, [userId, data.goalType, data.targetDate, data.weeklyTarget, JSON.stringify(data.preferredDays)]);
 
@@ -613,6 +614,32 @@ export const createGoal = async (userId, data) => {
     } finally {
         client.release();
     }
+};
+
+/**
+ * Mark goal as completed
+ */
+export const completeGoal = async (goalId) => {
+    console.log('Marking goal as completed:', goalId);
+    const result = await pool.query(`
+        UPDATE user_goals 
+        SET status = 'COMPLETED', is_active = FALSE, completed_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    `, [goalId]);
+    return result.rows[0];
+};
+
+/**
+ * Get goal history (completed goals)
+ */
+export const getGoalHistory = async (userId) => {
+    const result = await pool.query(`
+        SELECT * FROM user_goals 
+        WHERE user_id = $1 AND status = 'COMPLETED'
+        ORDER BY completed_at DESC
+    `, [userId]);
+    return result.rows;
 };
 
 /**
@@ -780,22 +807,47 @@ export const saveWeeklyPlanCache = async (userId, userWeekStart, planData) => {
 };
 
 export const calculateStreak = async (userId) => {
-    const res = await pool.query(`
-        WITH dates AS (
-            SELECT DISTINCT date_trunc('day', start_date) as day
-            FROM activities
-            WHERE user_id = $1
-        ),
-        groups AS (
-            SELECT day, ROW_NUMBER() OVER (ORDER BY day) as rn
-            FROM dates
-        )
-        SELECT COUNT(*) as streak
-        FROM groups
-        GROUP BY day - rn * INTERVAL '1 day'
-        ORDER BY streak DESC
-        LIMIT 1
+    // 1. Get the most recent activity date
+    const latestRes = await pool.query(`
+        SELECT date_trunc('day', MAX(start_date)) as last_activity
+        FROM activities
+        WHERE user_id = $1
     `, [userId]);
+
+    const lastActivityDate = latestRes.rows[0]?.last_activity;
+    if (!lastActivityDate) return 0;
+
+    // 2. Check if the streak is "alive" (last activity must be today or yesterday)
+    const isActive = await pool.query(`
+        SELECT ($1::date >= (CURRENT_DATE - INTERVAL '1 day')::date) as is_active
+    `, [lastActivityDate]);
+
+    if (!isActive.rows[0]?.is_active) {
+        return 0; // Streak broken
+    }
+
+    // 3. Calculate consecutive days ending at the last activity date
+    // We use a recursive CTE to go backwards from the latest date
+    const res = await pool.query(`
+        WITH RECURSIVE streak_chain AS (
+            -- Anchor: Start with the most recent activity date
+            SELECT date_trunc('day', $2::timestamp) as day
+            
+            UNION ALL
+            
+            -- Recursive: Find the day before, if it exists in the user's activities
+            SELECT (sc.day - INTERVAL '1 day')
+            FROM streak_chain sc
+            WHERE EXISTS (
+                SELECT 1 
+                FROM activities 
+                WHERE user_id = $1 
+                AND date_trunc('day', start_date) = (sc.day - INTERVAL '1 day')
+            )
+        )
+        SELECT COUNT(*) as streak FROM streak_chain;
+    `, [userId, lastActivityDate]);
+
     return parseInt(res.rows[0]?.streak || 0);
 };
 
@@ -848,37 +900,31 @@ export const saveMasterPlan = async (goalId, planData) => {
  * Clear all caches for a user (when goal changes)
  */
 export const clearUserCaches = async (userId) => {
-    console.log(`Clearing caches for user ${userId}`);
+    console.log(`[Cache] Clearing all caches for user ${userId}`);
     try {
-        // Clear daily plan caches
-        await pool.query(`
+        // 1. Clear daily plan caches
+        const dailyRes = await pool.query(`
             DELETE FROM daily_plan_cache WHERE user_id = $1
         `, [userId]);
+        console.log(`[Cache] Deleted ${dailyRes.rowCount} daily plans`);
 
-        // Clear weekly plan caches
-        await pool.query(`
+        // 2. Clear weekly plan caches
+        const weeklyRes = await pool.query(`
             DELETE FROM weekly_plan_cache WHERE user_id = $1
         `, [userId]);
+        console.log(`[Cache] Deleted ${weeklyRes.rowCount} weekly plans`);
 
-        // Clear master plans (linked to invalid/old goals)
-        // Since goal might have been updated, we delete master plans for this user's goals
-        // Or simpler: delete all master plans for user's goals
-        // But master_plans stores goal_id, not user_id. We need to join or assume goals.js handles goal deletion
+        // 3. Clear master plans (via JOIN with user_goals)
+        const masterRes = await pool.query(`
+            DELETE FROM master_plans 
+            USING user_goals 
+            WHERE master_plans.goal_id = user_goals.id 
+            AND user_goals.user_id = $1
+        `, [userId]);
+        console.log(`[Cache] Deleted ${masterRes.rowCount} master plans`);
 
-        // Wait, getting user's active goal to clear its master plan
-        const result = await pool.query(`SELECT id FROM user_goals WHERE user_id = $1`, [userId]);
-        const goalIds = result.rows.map(r => r.id);
-
-        if (goalIds.length > 0) {
-            await pool.query(`
-                DELETE FROM master_plans WHERE goal_id = ANY($1)
-            `, [goalIds]);
-        }
-
-        console.log('User caches and master plans cleared');
     } catch (err) {
-        console.error('Error clearing caches:', err.message);
-        // Don't throw - cache clearing is not critical
+        console.error('[Cache] Error clearing caches:', err.message);
     }
 };
 

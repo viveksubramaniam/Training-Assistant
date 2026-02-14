@@ -203,4 +203,51 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/goals/history
+ * Get completed goals history
+ */
+router.get('/history', requireAuth, async (req, res) => {
+    const userId = req.userId;
+    try {
+        const history = await db.getGoalHistory(userId);
+        res.json(history);
+    } catch (error) {
+        console.error('Get goal history failed:', error.message);
+        res.status(500).json({ error: 'Failed to get goal history' });
+    }
+});
+
+/**
+ * POST /api/goals/:id/complete
+ * Mark goal as completed
+ */
+router.post('/:id/complete', requireAuth, async (req, res) => {
+    const userId = req.userId;
+    const goalId = req.params.id;
+
+    try {
+        // Verify goal belongs to user
+        const existingGoal = await db.getGoalById(goalId);
+        if (!existingGoal || existingGoal.user_id.toString() !== userId.toString()) {
+            return res.status(404).json({ error: 'Goal not found' });
+        }
+
+        const completedGoal = await db.completeGoal(goalId);
+
+        // Clear caches as the active goal is now gone
+        try {
+            await db.clearUserCaches(userId);
+        } catch (e) {
+            console.log('Cache clear skipped:', e.message);
+        }
+
+        res.json({ success: true, goal: completedGoal });
+
+    } catch (error) {
+        console.error('Complete goal failed:', error.message);
+        res.status(500).json({ error: 'Failed to complete goal' });
+    }
+});
+
 export default router;
