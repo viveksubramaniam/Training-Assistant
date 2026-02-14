@@ -7,6 +7,8 @@ import ChatWidget from './components/ChatWidget';
 import { Clock, RefreshCw, Zap, Award, Activity } from 'lucide-react';
 import { API_BASE_URL } from './config/api';
 
+import StravaLoginButton from './components/LoginButton';
+
 /* -------------------------------------------------------------------------- */
 /*                                Login Screen                                */
 /* -------------------------------------------------------------------------- */
@@ -24,15 +26,9 @@ const LoginScreen = () => {
         <h1 className="text-4xl font-bold tracking-tight text-white mb-2">ECLIPSE <span className="text-primary">AI</span></h1>
         <p className="text-slate-400 mb-12 text-lg font-medium">Your adaptive performance coach.</p>
 
-        <a
-          href={`${API_BASE_URL}/api/auth/strava/login`}
-          className="w-full bg-[#ec4e06] hover:bg-[#d84605] text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-3 transition-transform active:scale-95 shadow-lg shadow-orange-900/20"
-        >
-          <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.png" alt="Strava" className="h-6 brightness-0 invert" />
-          <span className="font-bold">Connect with Strava</span>
-        </a>
+        <StravaLoginButton onLogin={() => window.location.href = `${API_BASE_URL}/api/auth/strava/login`} />
+
         <p className="mt-8 text-[10px] text-white/20 uppercase tracking-widest font-bold">Version 2.0.1 (Alpha)</p>
-        <p className="mt-2 text-[10px] text-red-500 font-mono">DEBUG API: '{API_BASE_URL}'</p>
       </div>
     </div>
   );
@@ -121,11 +117,14 @@ const App = () => {
         body: JSON.stringify({ fullSync: false })
       });
       if (res.ok) {
-        // Refresh activities
-        const actRes = await fetch(`${API_BASE_URL}/api/activities`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // Refresh activities (parallel refetch to save time)
+        const [actRes, userRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/activities`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/user`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
         if (actRes.ok) setActivities(await actRes.json());
+        if (userRes.ok) setUser(await userRes.json());
       }
     } catch (err) {
       console.error("Sync failed", err);
@@ -158,7 +157,7 @@ const App = () => {
       <div className="flex-1 overflow-hidden relative bg-deep-slate">
         {activeTab === 'home' && (
           <div className="h-full overflow-y-auto hide-scrollbar pb-20">
-            <DailyPlanTab user={user} onNavigateToCalendar={() => setActiveTab('plan')} />
+            <DailyPlanTab user={user} activities={activities} onNavigateToCalendar={() => setActiveTab('plan')} />
           </div>
         )}
 

@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from './config/api';
 import { Target, Edit3, Zap, TrendingUp, Heart, Clock, ChevronRight } from 'lucide-react';
 import GoalEditorModal from './GoalEditorModal';
+import ConfirmationModal from './components/ConfirmationModal';
 import PlanCreatingLoader from './components/PlanCreatingLoader';
 
 const ProfilePage = ({ user, activities }) => {
+    const [activeTab, setActiveTab] = useState('current'); // 'current' or 'history'
     const [showGoalEditor, setShowGoalEditor] = useState(false);
+    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
     const [currentGoal, setCurrentGoal] = useState(null);
+    const [goalHistory, setGoalHistory] = useState([]);
     const [savingGoal, setSavingGoal] = useState(false);
     const [creatingPlan, setCreatingPlan] = useState(false);
 
@@ -22,11 +26,12 @@ const ProfilePage = ({ user, activities }) => {
                     const data = await res.json();
                     if (data.hasGoal && data.goal) {
                         setCurrentGoal(data.goal);
+                    } else {
+                        setCurrentGoal(null);
                     }
                 }
             } catch (err) {
                 console.error('Failed to load goal:', err);
-                // Fallback to localStorage
                 const savedGoal = localStorage.getItem('trainingGoal');
                 if (savedGoal) {
                     setCurrentGoal(JSON.parse(savedGoal));
@@ -35,6 +40,26 @@ const ProfilePage = ({ user, activities }) => {
         };
         fetchGoal();
     }, []);
+
+    // Fetch history when tab changes
+    useEffect(() => {
+        if (activeTab === 'history') {
+            const fetchHistory = async () => {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch(`${API_BASE_URL}/api/goals/history`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        setGoalHistory(await res.json());
+                    }
+                } catch (err) {
+                    console.error('Failed to load history:', err);
+                }
+            };
+            fetchHistory();
+        }
+    }, [activeTab]);
 
     // Calculate weekly km from Sunday to Saturday
     const getWeeklyKm = () => {
@@ -87,9 +112,9 @@ const ProfilePage = ({ user, activities }) => {
                 preferredDays: goalData.preferredDays
             };
 
-            // Check if we have an existing goal to update or create new
-            const method = currentGoal?.id ? 'PUT' : 'POST';
-            const url = currentGoal?.id ? `${API_BASE_URL}/api/goals/${currentGoal.id}` : `${API_BASE_URL}/api/goals`;
+            // Always create a new goal so previous ones are archived/history is kept
+            const method = 'POST';
+            const url = `${API_BASE_URL}/api/goals`;
             const token = localStorage.getItem('authToken');
 
             const res = await fetch(url, {
@@ -129,28 +154,33 @@ const ProfilePage = ({ user, activities }) => {
                 }
             } else {
                 console.error('Failed to save goal to server');
-                const goal = {
-                    type: goalData.goalType,
-                    targetDate: goalData.targetDate,
-                    weeklyTarget: goalData.weeklyTarget,
-                    preferredDays: goalData.preferredDays
-                };
-                setCurrentGoal(goal);
-                localStorage.setItem('trainingGoal', JSON.stringify(goal));
             }
         } catch (err) {
             console.error('Error saving goal:', err);
-            const goal = {
-                type: goalData.goalType,
-                targetDate: goalData.targetDate,
-                weeklyTarget: goalData.weeklyTarget,
-                preferredDays: goalData.preferredDays
-            };
-            setCurrentGoal(goal);
-            localStorage.setItem('trainingGoal', JSON.stringify(goal));
         } finally {
             setSavingGoal(false);
             setCreatingPlan(false);
+        }
+    };
+
+    const executeCompleteGoal = async () => {
+        if (!currentGoal?.id) return;
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE_URL}/api/goals/${currentGoal.id}/complete`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                // Goal completed, reset current state
+                setCurrentGoal(null);
+                localStorage.removeItem('trainingGoal');
+                setActiveTab('history'); // Switch to history to see it
+            }
+        } catch (err) {
+            console.error('Failed to complete goal:', err);
         }
     };
 
@@ -170,6 +200,11 @@ const ProfilePage = ({ user, activities }) => {
         return `${Math.ceil(diffDays / 7)} weeks`;
     };
 
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'Unknown';
+        return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
     return (
         <div className="w-full min-h-screen bg-background-dark text-white flex flex-col pb-24">
             <main className="flex-1 p-5 pt-8 space-y-6">
@@ -181,168 +216,218 @@ const ProfilePage = ({ user, activities }) => {
                     </h1>
                 </div>
 
-                {/* Goal Section */}
-                <section className="glass-card p-6 rounded-2xl">
-                    <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                                <Target className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Current Goal</h2>
-                                <p className="text-xs text-white/40">
-                                    {currentGoal ? currentGoal.type : 'No goal set'}
-                                    {currentGoal?.targetDate && (
-                                        <span className="ml-2 text-primary">• {formatDaysUntil(currentGoal.targetDate)} left</span>
+                {/* Tab Switcher */}
+                <div className="flex gap-4 border-b border-white/10 pb-1">
+                    <button
+                        onClick={() => setActiveTab('current')}
+                        className={`pb-2 text-sm font-bold uppercase tracking-wide transition-colors ${activeTab === 'current' ? 'text-primary border-b-2 border-primary' : 'text-white/40 hover:text-white/60'}`}
+                    >
+                        Current Goal
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`pb-2 text-sm font-bold uppercase tracking-wide transition-colors ${activeTab === 'history' ? 'text-primary border-b-2 border-primary' : 'text-white/40 hover:text-white/60'}`}
+                    >
+                        History
+                    </button>
+                </div>
+
+                {activeTab === 'current' ? (
+                    <>
+                        {/* Goal Section */}
+                        <section className="glass-card p-6 rounded-2xl">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                                        <Target className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Current Goal</h2>
+                                        <p className="text-xs text-white/40">
+                                            {currentGoal ? currentGoal.type : 'No goal set'}
+                                            {currentGoal?.targetDate && (
+                                                <span className="ml-2 text-primary">• {formatDaysUntil(currentGoal.targetDate)} left</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    {currentGoal && (
+                                        <button
+                                            onClick={() => setShowCompleteConfirm(true)}
+                                            className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 transition-colors"
+                                            title="Mark as Completed"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                        </button>
                                     )}
-                                </p>
+                                    <button
+                                        onClick={() => setShowGoalEditor(true)}
+                                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                        title="Edit Goal"
+                                    >
+                                        <Edit3 className="w-4 h-4 text-white/60" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <button
-                            onClick={() => setShowGoalEditor(true)}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                        >
-                            <Edit3 className="w-4 h-4 text-white/60" />
-                        </button>
-                    </div>
 
-                    {/* Weekly Progress */}
-                    <div className="flex items-center gap-6">
-                        <div className="relative w-20 h-20 flex-shrink-0">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                                <path
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="rgba(255,255,255,0.1)"
-                                    strokeWidth="3"
-                                />
-                                <path
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="#f97415"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${goalPercentage}, 100`}
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
-                                {goalPercentage}%
-                            </span>
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Weekly Progress</p>
-                            <h3 className="text-3xl font-bold text-white tracking-tight">
-                                {weeklyKm.toFixed(1)} <span className="text-base font-normal text-white/40">/ {weeklyGoalKm} km</span>
-                            </h3>
-                            <p className="text-primary text-xs font-semibold mt-1">
-                                {remainingKm > 0 ? `${remainingKm.toFixed(1)} km to go` : '🎉 Goal reached!'}
-                            </p>
-                        </div>
-                    </div>
-                </section>
+                            {/* Weekly Progress */}
+                            <div className="flex items-center gap-6">
+                                <div className="relative w-20 h-20 flex-shrink-0">
+                                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none"
+                                            stroke="rgba(255,255,255,0.1)"
+                                            strokeWidth="3"
+                                        />
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none"
+                                            stroke="#f97415"
+                                            strokeWidth="3"
+                                            strokeDasharray={`${goalPercentage}, 100`}
+                                            strokeLinecap="round"
+                                        />
+                                    </svg>
+                                    <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+                                        {goalPercentage}%
+                                    </span>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Weekly Progress</p>
+                                    <h3 className="text-3xl font-bold text-white tracking-tight">
+                                        {weeklyKm.toFixed(1)} <span className="text-base font-normal text-white/40">/ {weeklyGoalKm} km</span>
+                                    </h3>
+                                    <p className="text-primary text-xs font-semibold mt-1">
+                                        {remainingKm > 0 ? `${remainingKm.toFixed(1)} km to go` : '🎉 Goal reached!'}
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="glass-card p-5 rounded-xl border-l-4 border-l-primary">
-                        <div className="flex justify-between items-start">
-                            <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Fitness Score</p>
-                            <TrendingUp className="w-4 h-4 text-primary" />
+                        {/* Recent Activities Header */}
+                        <div className="flex items-center justify-between pt-2">
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-white/60">Recent Activities</h2>
+                            <span className="text-xs text-white/30">{recentActivities.length} shown</span>
                         </div>
-                        <p className="text-3xl font-bold text-white mt-2 tracking-tight">{stats.fitness}</p>
-                        <p className="text-emerald-400 text-xs font-medium mt-1">+{stats.fitnessTrend} pts this week</p>
-                    </div>
-                    <div className="glass-card p-5 rounded-xl border-l-4 border-l-blue-500">
-                        <div className="flex justify-between items-start">
-                            <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Fatigue Level</p>
-                            <Heart className="w-4 h-4 text-blue-500" />
-                        </div>
-                        <p className="text-3xl font-bold text-white mt-2 tracking-tight">{stats.fatigue}</p>
-                        <p className="text-white/40 text-xs font-medium mt-1">Optimal Recovery Zone</p>
-                    </div>
-                </div>
 
-                {/* Recent Activities Header */}
-                <div className="flex items-center justify-between pt-2">
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-white/60">Recent Activities</h2>
-                    <span className="text-xs text-white/30">{recentActivities.length} shown</span>
-                </div>
+                        {/* Activity Cards */}
+                        <div className="space-y-3">
+                            {recentActivities.length > 0 ? recentActivities.map(activity => {
+                                const dateStr = activity.start_date || activity.date;
+                                const displayDate = dateStr ? new Date(dateStr).toLocaleDateString(undefined, {
+                                    weekday: 'short', month: 'short', day: 'numeric'
+                                }) : 'Unknown';
+                                const distanceKm = activity.distance ? (activity.distance / 1000).toFixed(2) : '--';
+                                const avgSpeed = activity.average_speed || 0;
+                                const avgPace = avgSpeed > 0 ? `${Math.floor(16.6667 / avgSpeed)}:${Math.round((16.6667 / avgSpeed % 1) * 60).toString().padStart(2, '0')}` : '--';
+                                const movingTime = activity.moving_time || 0;
+                                const duration = movingTime > 0 ? `${Math.floor(movingTime / 60)}:${(movingTime % 60).toString().padStart(2, '0')}` : '--';
+                                const avgHr = activity.average_heartrate ? Math.round(activity.average_heartrate) : null;
 
-                {/* Activity Cards */}
-                <div className="space-y-3">
-                    {recentActivities.length > 0 ? recentActivities.map(activity => {
-                        const dateStr = activity.start_date || activity.date;
-                        const displayDate = dateStr ? new Date(dateStr).toLocaleDateString(undefined, {
-                            weekday: 'short', month: 'short', day: 'numeric'
-                        }) : 'Unknown';
-                        const distanceKm = activity.distance ? (activity.distance / 1000).toFixed(2) : '--';
-                        const avgSpeed = activity.average_speed || 0;
-                        const avgPace = avgSpeed > 0 ? `${Math.floor(16.6667 / avgSpeed)}:${Math.round((16.6667 / avgSpeed % 1) * 60).toString().padStart(2, '0')}` : '--';
-                        const movingTime = activity.moving_time || 0;
-                        const duration = movingTime > 0 ? `${Math.floor(movingTime / 60)}:${(movingTime % 60).toString().padStart(2, '0')}` : '--';
-                        const avgHr = activity.average_heartrate ? Math.round(activity.average_heartrate) : null;
+                                return (
+                                    <div
+                                        key={activity.id}
+                                        className="glass-card rounded-xl overflow-hidden hover:border-primary/30 transition-all group cursor-pointer"
+                                    >
+                                        <div className="p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                                        <Zap className="w-5 h-5 text-primary" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
+                                                            {activity.name}
+                                                        </h4>
+                                                        <p className="text-xs text-white/40">{displayDate}</p>
+                                                    </div>
+                                                </div>
 
-                        return (
-                            <div
-                                key={activity.id}
-                                className="glass-card rounded-xl overflow-hidden hover:border-primary/30 transition-all group cursor-pointer"
-                            >
-                                <div className="p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                                <Zap className="w-5 h-5 text-primary" />
+                                                {/* Effort Badge */}
+                                                {activity.relativeEffort && (
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${activity.relativeEffort.toLowerCase() === 'low' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        activity.relativeEffort.toLowerCase() === 'moderate' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                            'bg-red-500/20 text-red-400'
+                                                        }`}>
+                                                        {activity.relativeEffort}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
-                                                    {activity.name}
-                                                </h4>
-                                                <p className="text-xs text-white/40">{displayDate}</p>
+
+                                            {/* Stats Row */}
+                                            <div className="grid grid-cols-4 gap-3 mt-4 pt-3 border-t border-white/5">
+                                                <div>
+                                                    <p className="text-[10px] text-white/40 uppercase font-medium">Distance</p>
+                                                    <p className="text-sm font-bold text-white">{distanceKm}<span className="text-xs text-white/40 ml-0.5">km</span></p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-white/40 uppercase font-medium">Time</p>
+                                                    <p className="text-sm font-bold text-white">{duration}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-white/40 uppercase font-medium">Pace</p>
+                                                    <p className="text-sm font-bold text-primary">{avgPace}<span className="text-xs text-white/40 ml-0.5">/km</span></p>
+                                                </div>
+                                                {avgHr && (
+                                                    <div>
+                                                        <p className="text-[10px] text-white/40 uppercase font-medium">Avg HR</p>
+                                                        <p className="text-sm font-bold text-rose-400">{avgHr}<span className="text-xs text-white/40 ml-0.5">bpm</span></p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-
-                                        {/* Effort Badge */}
-                                        {activity.relativeEffort && (
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${activity.relativeEffort.toLowerCase() === 'low' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                activity.relativeEffort.toLowerCase() === 'moderate' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    'bg-red-500/20 text-red-400'
-                                                }`}>
-                                                {activity.relativeEffort}
-                                            </span>
-                                        )}
+                                    </div>
+                                );
+                            }) : (
+                                <div className="glass-card rounded-xl p-8 text-center">
+                                    <Zap className="w-8 h-8 text-white/20 mx-auto mb-3" />
+                                    <p className="text-white/40 text-sm">No recent activities found</p>
+                                    <p className="text-white/20 text-xs mt-1">Sync with Strava to see your workouts</p>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    /* History Tab */
+                    <div className="space-y-4 animate-in slide-in-from-right duration-300">
+                        {goalHistory.length > 0 ? (
+                            goalHistory.map(goal => (
+                                <div key={goal.id} className="glass-card p-5 rounded-xl border border-white/5 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-3">
+                                        <div className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                            Completed
+                                        </div>
                                     </div>
 
-                                    {/* Stats Row */}
-                                    <div className="grid grid-cols-4 gap-3 mt-4 pt-3 border-t border-white/5">
+                                    <h3 className="text-lg font-bold text-white">{goal.goal_type}</h3>
+                                    <p className="text-xs text-white/40 mb-3">Completed on {formatDate(goal.completed_at || goal.created_at)}</p>
+
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-[10px] text-white/40 uppercase font-medium">Distance</p>
-                                            <p className="text-sm font-bold text-white">{distanceKm}<span className="text-xs text-white/40 ml-0.5">km</span></p>
+                                            <p className="text-[10px] text-white/40 uppercase font-medium">Weekly Target</p>
+                                            <p className="text-sm font-bold text-white">{goal.weekly_target_distance} km</p>
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] text-white/40 uppercase font-medium">Time</p>
-                                            <p className="text-sm font-bold text-white">{duration}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-white/40 uppercase font-medium">Pace</p>
-                                            <p className="text-sm font-bold text-primary">{avgPace}<span className="text-xs text-white/40 ml-0.5">/km</span></p>
-                                        </div>
-                                        {avgHr && (
+                                        {goal.target_date && (
                                             <div>
-                                                <p className="text-[10px] text-white/40 uppercase font-medium">Avg HR</p>
-                                                <p className="text-sm font-bold text-rose-400">{avgHr}<span className="text-xs text-white/40 ml-0.5">bpm</span></p>
+                                                <p className="text-[10px] text-white/40 uppercase font-medium">Target Date</p>
+                                                <p className="text-sm font-bold text-white">{formatDate(goal.target_date)}</p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="glass-card rounded-xl p-10 text-center">
+                                <span className="material-symbols-outlined text-4xl text-white/20 mb-3">history</span>
+                                <h3 className="text-white font-bold">No history yet</h3>
+                                <p className="text-white/40 text-sm mt-1">Complete your goals to see them here!</p>
                             </div>
-                        );
-                    }) : (
-                        <div className="glass-card rounded-xl p-8 text-center">
-                            <Zap className="w-8 h-8 text-white/20 mx-auto mb-3" />
-                            <p className="text-white/40 text-sm">No recent activities found</p>
-                            <p className="text-white/20 text-xs mt-1">Sync with Strava to see your workouts</p>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
 
             </main>
 
@@ -358,6 +443,17 @@ const ProfilePage = ({ user, activities }) => {
             <PlanCreatingLoader
                 isVisible={creatingPlan}
                 message="Your plan is now being created"
+            />
+
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showCompleteConfirm}
+                onClose={() => setShowCompleteConfirm(false)}
+                onConfirm={executeCompleteGoal}
+                title="Complete Goal?"
+                message="Are you sure you want to mark this goal as completed? This will save it to your history and clear your current training plan to make way for a new one."
+                confirmText="Yes, Complete it"
+                isDangerous={false}
             />
         </div>
     );

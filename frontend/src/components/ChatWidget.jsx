@@ -30,10 +30,13 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
         setIsLoading(true);
 
         try {
+            const token = localStorage.getItem('authToken');
             const response = await fetch(`${API_BASE_URL}/api/coach/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ message: userMessage })
             });
 

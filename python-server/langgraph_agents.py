@@ -64,24 +64,34 @@ OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 def call_llm(prompt: str, system: str = "You are an expert running coach.") -> str:
     """Call the LLM endpoint (OpenRouter or Local)."""
     try:
+        current_model = MODEL_NAME
+        
         if OPENAI_API_KEY:
             # Use OpenRouter
             endpoint = OPENROUTER_ENDPOINT
             headers = {
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/langchain-ai/langgraph", # Required by OpenRouter sometimes
+                "X-Title": "AI Run Coach"
             }
+            # Fallback if model is standard default but we're on OpenRouter
+            if current_model == "local-model":
+                current_model = "google/gemini-2.0-flash-001"
+                print(f"[LLM] 'local-model' detected with API Key. Switching to {current_model} for OpenRouter.")
         else:
             # Use Local LLM (e.g. LM Studio)
             endpoint = LLM_ENDPOINT
             headers = {"Content-Type": "application/json"}
             print(f"[LLM] Using local endpoint: {endpoint}")
         
+        print(f"[LLM] Sending request to {endpoint} using model {current_model}")
+        
         response = requests.post(
             endpoint,
             headers=headers,
             json={
-                "model": MODEL_NAME,
+                "model": current_model,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt}
@@ -91,11 +101,31 @@ def call_llm(prompt: str, system: str = "You are an expert running coach.") -> s
             },
             timeout=60
         )
+        
+        if response.status_code != 200:
+            print(f"[LLM] Error Status: {response.status_code}")
+            print(f"[LLM] Error Body: {response.text}")
+            
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"LLM call failed: {e}")
         raise
+
+def parse_json_response(response: str) -> dict:
+    """Extract and parse JSON from LLM response."""
+    import re
+    # 1. Try to find markdown code block
+    json_match = re.search(r'```json\s*(.*?)```, response, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group(1))
+    
+    # 2. Try to find first/last braces
+    json_match = re.search(r'\{.*\}', response, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group(0))
+        
+    raise ValueError("No JSON found in response")
 
 # =============================================================================
 # ORCHESTRATOR LLM NODE
@@ -280,6 +310,7 @@ def master_planning_agent(state: PlanState) -> PlanState:
 GOAL: {goal.get('type', 'General Fitness')}
 TARGET DATE: {goal.get('targetDate', 'Not specified')}
 WEEKLY TARGET: {goal.get('weeklyTarget', 40)}km
+WORKOUT DAYS: {goal.get('preferredWorkoutDays', ['Sun', 'Tue', 'Thu'])}
 
 RECENT ACTIVITY:
 {activity_context}
@@ -292,7 +323,9 @@ Create a periodized plan with phases:
 
 If there are not so many weeks, you can take a call on how to split the weeeks. Minimum 1 week of a plan is expected. 
 
-Respond with ONLY valid JSON, dont enter newlines or extra spaces:
+
+Respond with ONLY valid JSON wrapped in a markdown block:
+```json
 {{
   "weeks": [
     {{"week": 1, "theme": "Base Building", "focus": "Aerobic foundation", "targetKm": 30, "numWorkouts": 5, "numRestDays": 2, "keyWorkouts": ["Long run", "Easy runs"]}},
@@ -302,25 +335,22 @@ Respond with ONLY valid JSON, dont enter newlines or extra spaces:
   "total_weeks": {total_weeks},
   "peak_week": {max(1, total_weeks - 3)},
   "taper_start_week": {max(1, total_weeks - 1)}
-}}"""
+}}
+```
+"""
 
     try:
         response = call_llm(prompt)
         
-        # Parse JSON from response
-        import re
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-        if json_match:
-            master_plan = json.loads(json_match.group())
-            state["master_plan"] = master_plan
-            state["is_master_plan_ready"] = True
-            print("[Master Planning Agent] Master plan generated via LLM")
-            print(f"[Master Planning Agent] RESPONSE: {json.dumps(master_plan, indent=2)[:1000]}...")
-        else:
-            raise ValueError("No JSON found in response")
+        master_plan = parse_json_response(response)
+        state["master_plan"] = master_plan
+        state["is_master_plan_ready"] = True
+        print("[Master Planning Agent] Master plan generated via LLM")
+        print(f"[Master Planning Agent] RESPONSE: {json.dumps(master_plan, indent=2)[:1000]}...")
             
     except Exception as e:
         print(f"[Master Planning Agent] LLM generation failed: {e}")
+        # print(f"[Master Planning Agent] RAW RESPONSE: {response}") # Can't print response if call_llm raised, but usually it returns str
         print("[Master Planning Agent] Using programmatic fallback")
         
         # Fallback: Generate a basic periodized plan
@@ -441,15 +471,13 @@ WEEKLY TARGET: {goal.get('weeklyTarget', 40)}km
 {completed_days_info}
 {modification_context}
 
-Create exactly 7 days with varied workouts. Include:
-- 2 rest days
-- 1 long run
-- 1-2 interval/speed sessions
-- 2-3 easy runs
+Create exactly 7 days with varied workouts. Include a balanced workout, easy runs, tempo runs, long runs, and intervals.
+But always stick to the weekly target and the days of the week that user wants to run.
 
 IMPORTANT: The values in the JSON structure below are just for format reference (e.g. distance must be a number). You MUST generate specific, appropriate values for target_time, target_pace, distance, and intensity based on the athlete's level and the goal of the specific workout. Do not simply copy the example values.
 
-Respond with ONLY valid JSON:
+Respond with ONLY valid JSON wrapped in a markdown block:
+```json
 {{
   "weekNumber": {current_week},
   "weekTheme": "{week_theme}",
@@ -458,26 +486,24 @@ Respond with ONLY valid JSON:
     {{"date": "YYYY-MM-DD", "dayName": "Monday", "title": "Workout Title", "workout_type": "Easy Run|Interval|Long Run|Tempo|Rest", "target_time": "e.g. 45 mins", "target_pace": "e.g. 5:30 /km", "distance": 5, "intensity": 2, "description": "Specific workout details..."}}
   ],
   "restDays": 2
-}}"""
+}}
+```"""
 
     try:
         response = call_llm(prompt)
         
-        # Parse JSON from response
-        import re
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-        if json_match:
-            weekly_plan = json.loads(json_match.group())
-            state["weekly_plan"] = weekly_plan
-            state["is_weekly_plan_ready"] = True
-            state["needs_weekly_update"] = False
-            state["pending_modification"] = None  # Clear after applying
-            print(f"[Weekly Planner] RESPONSE: {json.dumps(weekly_plan, indent=2)[:1000]}...")
-        else:
-            raise ValueError("No JSON found in response")
+        weekly_plan = parse_json_response(response)
+        state["weekly_plan"] = weekly_plan
+        state["is_weekly_plan_ready"] = True
+        state["needs_weekly_update"] = False
+        state["pending_modification"] = None  # Clear after applying
+        print(f"[Weekly Planner] RESPONSE: {json.dumps(weekly_plan, indent=2)[:1000]}...")
             
     except Exception as e:
         print(f"Weekly planner error: {e}")
+        try:
+             print(f"RAW RESPONSE: {response}")
+        except: pass
         # Fallback plan
         days = []
         for i in range(7):
@@ -596,7 +622,8 @@ INTENSITY LABELS (use ONLY these):
 - "Intense" (for intervals/hard efforts, red badge)
 - "Workout" (for structured sessions, orange badge)
 
-Respond with ONLY valid JSON:
+Respond with ONLY valid JSON wrapped in a markdown block:
+```json
 {{
   "recommended": {{
     "type": "{today_workout.get('workout_type', 'Easy Run')}",
@@ -611,25 +638,24 @@ Respond with ONLY valid JSON:
   "option_2": {{ "type": "Easy Run", "title": "Light Recovery", "intensityLabel": "Moderate", ... }},
   "option_3": {{ "type": "Cross Training", "title": "Alternative", "intensityLabel": "Moderate", ... }},
   "aiInsight": "Brief coaching tip for today"
-}}"""
+}}
+```"""
 
     try:
         response = call_llm(prompt)
         
-        import re
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-        if json_match:
-            daily_plan = json.loads(json_match.group())
-            daily_plan["date"] = today
-            daily_plan["fromWeeklyPlan"] = today_workout
-            state["daily_plan"] = daily_plan
-            state["is_daily_plan_ready"] = True
-            print(f"[Daily Planner] RESPONSE: {json.dumps(daily_plan, indent=2)[:1000]}...")
-        else:
-            raise ValueError("No JSON found in response")
+        daily_plan = parse_json_response(response)
+        daily_plan["date"] = today
+        daily_plan["fromWeeklyPlan"] = today_workout
+        state["daily_plan"] = daily_plan
+        state["is_daily_plan_ready"] = True
+        print(f"[Daily Planner] RESPONSE: {json.dumps(daily_plan, indent=2)[:1000]}...")
             
     except Exception as e:
         print(f"Daily planner error: {e}")
+        try:
+             print(f"RAW RESPONSE: {response}")
+        except: pass
         # Fallback plan based on weekly
         state["daily_plan"] = {
             "date": today,

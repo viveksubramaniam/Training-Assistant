@@ -100,8 +100,10 @@ router.get('/user', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const streak = await db.calculateStreak(user.stravaId);
+
         console.log('User authenticated:', user.name);
-        res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime });
+        res.json({ name: user.name, profile: user.profile, lastSyncTime: user.lastSyncTime, streak });
 
     } catch (err) {
         console.error('Invalid Token:', err.message);

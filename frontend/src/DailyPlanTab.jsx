@@ -5,7 +5,25 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
     const [selectedWorkout, setSelectedWorkout] = useState(null);
     const [loading, setLoading] = useState(true);
     const [todayFocus, setTodayFocus] = useState([]);
+    const [weeklyPlan, setWeeklyPlan] = useState(null);
     const hasTriggeredSync = useRef(false);
+
+    // Dynamic Date Helpers
+    const getCurrentDayInfo = () => {
+        const now = new Date();
+        const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const dayIndex = now.getDay(); // 0 = Sun
+        const isoDay = dayIndex === 0 ? 7 : dayIndex; // 1 = Mon, 7 = Sun
+
+        return {
+            dayName: dayMap[dayIndex],
+            dayNumber: isoDay, // 1-7
+            date: now.getDate(),
+            month: now.toLocaleDateString('en-US', { month: 'short' })
+        };
+    };
+
+    const { dayName, dayNumber, date, month } = getCurrentDayInfo();
 
     useEffect(() => {
         let isMounted = true;
@@ -13,15 +31,19 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
 
         const startProcess = async () => {
             try {
-                // Check if we already have the plan
                 const token = localStorage.getItem('authToken');
                 const headers = { 'Authorization': `Bearer ${token}` };
 
-                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers });
-                const data = await response.json();
+                // Fetch both Daily and Weekly plans
+                const [dailyRes, weeklyRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers }),
+                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers })
+                ]);
 
-                if (data.status === 'generating' || data.status === 'syncing') {
-                    // Plan missing or regenerating, trigger sync only once
+                const dailyData = await dailyRes.json();
+                const weeklyData = await weeklyRes.json();
+
+                if (dailyData.status === 'generating' || dailyData.status === 'syncing') {
                     if (!hasTriggeredSync.current) {
                         hasTriggeredSync.current = true;
                         console.log("Plan missing/generating, triggering sync...");
@@ -30,20 +52,23 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                             headers
                         });
                     }
-                    // Start polling
                     pollData();
                 } else {
-                    // We have data! Process it immediately
-                    if (isMounted) handlePlanData(data);
+                    if (isMounted) {
+                        handlePlanData(dailyData);
+                        if (weeklyData && !weeklyData.status) {
+                            setWeeklyPlan(weeklyData);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Initial check failed:", error);
-                // Fallback to polling/syncing just in case
                 pollData();
             }
         };
 
         const handlePlanData = (data) => {
+            // ... (Existing transformation logic remains exactly the same) ... 
             // Transform API data to component format
             // API structure: { recommended: {...}, option_2: {...}, option_3: {...}, ... }
             let workouts = [];
@@ -121,10 +146,8 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                     }
                 ];
             } else if (Array.isArray(data)) {
-                // Legacy array fallback
                 workouts = data;
             } else {
-                // Fallback if data is completely missing/malformed
                 console.warn("Unexpected data format, using fallback", data);
                 setLoading(false);
                 return;
@@ -139,24 +162,30 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
 
             try {
                 const token = localStorage.getItem('authToken');
-                const response = await fetch(`${API_BASE_URL}/api/coach/daily-plan`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
+                const headers = { 'Authorization': `Bearer ${token}` };
+
+                const [dailyRes, weeklyRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers }),
+                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers })
+                ]);
+
+                const dailyData = await dailyRes.json();
+                const weeklyData = await weeklyRes.json();
 
                 if (!isMounted) return;
 
-                if (data.status === 'generating' || data.status === 'syncing') {
-                    // Poll again in 2 seconds
+                if (dailyData.status === 'generating' || dailyData.status === 'syncing') {
                     pollInterval = setTimeout(pollData, 2000);
                     return;
                 }
 
-                handlePlanData(data);
+                handlePlanData(dailyData);
+                if (weeklyData && !weeklyData.status) {
+                    setWeeklyPlan(weeklyData);
+                }
 
             } catch (error) {
                 console.error("Failed to fetch plan:", error);
-                // Keep loading or show error? For now, keep loading state to avoid jarring error UI
             }
         };
 
@@ -167,6 +196,23 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
             if (pollInterval) clearTimeout(pollInterval);
         };
     }, []);
+
+    // Helper to get future days from weekly plan
+    const getUpcomingDays = () => {
+        if (!weeklyPlan || !weeklyPlan.days) return [];
+
+        // Get local YYYY-MM-DD
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
+        // Filter for days strictly after today
+        return weeklyPlan.days.filter(d => d.date > todayStr).slice(0, 5);
+    };
+
+    const upcomingWorkouts = getUpcomingDays();
 
     return (
         <div className="space-y-6 pb-24">
@@ -187,7 +233,7 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                     {/* Big Streak Bubble */}
                     <div className="flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 px-3 py-1.5 rounded-full border border-orange-500/30">
                         <span className="material-symbols-outlined text-orange-500 text-base">local_fire_department</span>
-                        <span className="text-xs font-bold text-orange-400 tracking-wide">12 Day Streak</span>
+                        <span className="text-xs font-bold text-orange-400 tracking-wide">{user?.streak || 0} Day Streak</span>
                     </div>
                 </div>
             </header>
@@ -205,7 +251,7 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                     <section className="space-y-4">
                         <div className="flex items-baseline justify-between">
                             <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">Today's Focus</h2>
-                            <span className="text-[10px] font-medium opacity-50 uppercase text-slate-500">Oct 24</span>
+                            <span className="text-[10px] font-medium opacity-50 uppercase text-slate-500">{month} {date}</span>
                         </div>
 
                         {/* Expandable Card Logic */}
@@ -289,7 +335,7 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                         )}
                     </section>
 
-                    {/* 2. Week Progress (Moved Up) */}
+                    {/* 2. Week Progress (Dynamic) */}
                     <section className="glass-card bg-gradient-to-br from-indigo-900/20 to-slate-900/50 p-5 rounded-2xl border border-indigo-500/20 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-20">
                             <span className="material-symbols-outlined text-6xl text-white">flag</span>
@@ -300,61 +346,48 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
                             <div className="relative w-20 h-20 flex-none">
                                 <svg className="w-full h-full -rotate-90 drop-shadow-xl" viewBox="0 0 100 100">
                                     <circle className="text-slate-800" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeWidth="8"></circle>
-                                    <circle className="text-primary" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeDasharray="263.8" strokeDashoffset="79" strokeLinecap="round" strokeWidth="8"></circle>
+                                    <circle className="text-primary" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeDasharray={`${(dayNumber / 7) * 263.8} 263.8`} strokeLinecap="round" strokeWidth="8"></circle>
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-xl font-bold text-white leading-none tracking-tight">42</span>
-                                    <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">/ 60</span>
+                                    <span className="text-xl font-bold text-white leading-none tracking-tight">{Math.round((dayNumber / 7) * 100)}%</span>
+                                    <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">Week</span>
                                 </div>
                             </div>
 
                             {/* Text Content */}
                             <div className="space-y-1">
                                 <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">Week Progress</h3>
-                                <p className="text-xl font-bold text-white">Day 4 <span className="text-slate-500 text-base font-medium">/ 7</span></p>
-                                <p className="text-xs text-indigo-200/60 leading-relaxed">You are crushing your weekly volume goals. Keep it up!</p>
+                                <p className="text-xl font-bold text-white">Day {dayNumber} <span className="text-slate-500 text-base font-medium">/ 7</span></p>
+                                <p className="text-xs text-indigo-200/60 leading-relaxed">It's {dayName}! Keep consistent with your weekly plan.</p>
                             </div>
                         </div>
                     </section>
 
-                    {/* 3. The Road Ahead (Moved Down) */}
+                    {/* 3. The Road Ahead (Synced with Weekly Plan) */}
                     <section className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">The Road Ahead</h2>
                             <button className="text-[10px] font-medium text-primary hover:text-orange-300 transition-colors" onClick={onNavigateToCalendar}>Full Calendar</button>
                         </div>
                         <div className="flex overflow-x-auto gap-4 hide-scrollbar pb-4 -mx-5 px-5 snap-x">
-                            {/* Mock Upcoming Days */}
-                            <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border-l-4 border-l-primary snap-center flex flex-col justify-between h-28">
-                                <div>
-                                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Fri</p>
-                                    <h4 className="text-sm font-bold mt-1 text-white leading-tight">Speed Intervals</h4>
+                            {upcomingWorkouts.length > 0 ? (
+                                upcomingWorkouts.map((day, idx) => (
+                                    <div key={idx} className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border-l-4 border-l-primary snap-center flex flex-col justify-between h-28">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-primary uppercase tracking-widest">{day.dayName}</p>
+                                            <h4 className="text-sm font-bold mt-1 text-white leading-tight line-clamp-2">{day.title || day.activity_type || "Rest Day"}</h4>
+                                        </div>
+                                        <div className="flex items-center justify-between border-t border-white/5 pt-2">
+                                            <span className="text-[10px] font-mono text-slate-400">{day.distance ? `${day.distance}km` : 'Recovery'}</span>
+                                            <span className="material-symbols-outlined text-sm text-primary">bolt</span>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="w-full text-center py-4 text-slate-500 text-xs">
+                                    No upcoming workouts this week.
                                 </div>
-                                <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                                    <span className="text-[10px] font-mono text-slate-400">12k • 5am</span>
-                                    <span className="material-symbols-outlined text-sm text-primary">bolt</span>
-                                </div>
-                            </div>
-                            <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border border-white/5 snap-center flex flex-col justify-between h-28 hover:bg-slate-800 transition-colors cursor-pointer">
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sat</p>
-                                    <h4 className="text-sm font-bold mt-1 text-white leading-tight">Long Run</h4>
-                                </div>
-                                <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                                    <span className="text-[10px] font-mono text-slate-400">24k • 7am</span>
-                                    <span className="material-symbols-outlined text-sm text-slate-500">timer</span>
-                                </div>
-                            </div>
-                            <div className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border border-white/5 snap-center flex flex-col justify-between h-28 hover:bg-slate-800 transition-colors cursor-pointer">
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sun</p>
-                                    <h4 className="text-sm font-bold mt-1 text-white leading-tight">Active Rest</h4>
-                                </div>
-                                <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                                    <span className="text-[10px] font-mono text-slate-400">Yoga</span>
-                                    <span className="material-symbols-outlined text-sm text-emerald-500">spa</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </section>
 
