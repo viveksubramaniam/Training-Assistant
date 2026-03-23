@@ -239,6 +239,7 @@ export const cacheWeeklyPlan = adapter.saveWeeklyPlanCache; // Alias for coach.j
 // Analytics & Context
 export const getRecentActivities = adapter.getRecentActivities;
 export const getWeeklyPoints = adapter.getWeeklyPoints;
+export const getFitnessProfile = adapter.getFitnessProfile;
 export const calculateStreak = adapter.calculateStreak;
 
 // Coach Chat

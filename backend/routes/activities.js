@@ -116,11 +116,10 @@ router.get('/:id', requireAuth, async (req, res) => {
     const userId = req.session.stravaId;
 
     // Validate activity ID is numeric
-    // Temporarily disabled for debugging
-    // if (!/^\d+$/.test(activityId)) {
-    //     console.log(`Invalid activity ID: ${activityId}`);
-    //     return res.status(400).json({ error: 'Invalid activity ID' });
-    // }
+    if (!/^\d+$/.test(activityId)) {
+        console.log(`Invalid activity ID: ${activityId}`);
+        return res.status(400).json({ error: 'Invalid activity ID' });
+    }
 
     // Check if we have detailed data in cache
     const cachedActivity = await db.getActivity(userId, activityId);

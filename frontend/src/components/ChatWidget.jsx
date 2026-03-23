@@ -1,31 +1,81 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
+import { Send, Sparkles, Loader2, Target, Calendar, TrendingUp, SkipForward, ArrowLeftRight, Gauge, Clock, MessageCircle, BarChart3, CalendarPlus } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 
-const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
+const ACTION_BADGES = {
+    create_goal: { label: 'Goal Created', icon: Target, color: 'text-emerald-400 border-emerald-500/30' },
+    update_goal: { label: 'Goal Updated', icon: Target, color: 'text-blue-400 border-blue-500/30' },
+    delete_goal: { label: 'Goal Removed', icon: Target, color: 'text-red-400 border-red-500/30' },
+    skip_workout: { label: 'Workout Skipped', icon: SkipForward, color: 'text-amber-400 border-amber-500/30' },
+    swap_workouts: { label: 'Workouts Swapped', icon: ArrowLeftRight, color: 'text-purple-400 border-purple-500/30' },
+    adjust_difficulty: { label: 'Intensity Adjusted', icon: Gauge, color: 'text-orange-400 border-orange-500/30' },
+    adjust_intensity: { label: 'Intensity Adjusted', icon: Gauge, color: 'text-orange-400 border-orange-500/30' },
+    modify_plan: { label: 'Plan Updated', icon: Sparkles, color: 'text-primary border-primary/30' },
+    get_estimate: { label: 'Estimate', icon: Clock, color: 'text-cyan-400 border-cyan-500/30' },
+    weekly_summary: { label: 'Weekly Summary', icon: BarChart3, color: 'text-indigo-400 border-indigo-500/30' },
+    extend_goal: { label: 'Goal Extended', icon: CalendarPlus, color: 'text-teal-400 border-teal-500/30' },
+};
+
+const QUICK_SUGGESTIONS = [
+    { label: 'Skip today', message: "Skip today's workout, I need rest" },
+    { label: 'Make it easier', message: "Make today's workout easier" },
+    { label: 'Make it harder', message: "Give me a harder workout today" },
+    { label: 'Time estimate', message: "How long will today's workout take?" },
+    { label: 'Weekly summary', message: "How is my week going so far?" },
+    { label: 'Push goal back', message: "Push my goal back by 2 weeks" },
+];
+
+const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: "Hi! I'm your AI coach. Ask me anything about your training or tell me if you need to adjust today's workout." }
+        { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!" }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(true);
+    const [historyLoaded, setHistoryLoaded] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // Load chat history from DB on first open
+    useEffect(() => {
+        if (isOpen && !historyLoaded) {
+            const loadHistory = async () => {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch(`${API_BASE_URL}/api/coach/chat/history`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.messages && data.messages.length > 0) {
+                            setMessages(data.messages);
+                            setShowSuggestions(false);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load chat history:', err);
+                }
+                setHistoryLoaded(true);
+            };
+            loadHistory();
+        }
+    }, [isOpen, historyLoaded]);
+
     useEffect(() => {
         if (isOpen) {
-            // Small delay to allow animation to start before scrolling
             setTimeout(scrollToBottom, 300);
         }
     }, [messages, isOpen]);
 
-    const sendMessage = async () => {
-        if (!input.trim() || isLoading) return;
+    const sendMessage = async (messageText) => {
+        const userMessage = (messageText || input).trim();
+        if (!userMessage || isLoading) return;
 
-        const userMessage = input.trim();
         setInput('');
+        setShowSuggestions(false);
         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setIsLoading(true);
 
@@ -45,12 +95,19 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: data.message,
-                planUpdate: data.planUpdate
+                action: data.action,
+                planUpdate: data.planUpdate,
+                goalChanged: data.goalChanged
             }]);
 
-            // Notify parent if plan was updated
+            // Notify parent about plan updates
             if (data.planUpdate && onPlanUpdate) {
                 onPlanUpdate(data.updatedPlan);
+            }
+
+            // Notify parent about goal changes
+            if (data.goalChanged && onGoalChanged) {
+                onGoalChanged();
             }
 
         } catch (error) {
@@ -68,6 +125,35 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
             e.preventDefault();
             sendMessage();
         }
+    };
+
+    const handleSuggestionClick = (suggestion) => {
+        sendMessage(suggestion.message);
+    };
+
+    const renderActionBadge = (msg) => {
+        if (!msg.action || msg.action === 'chat') {
+            if (msg.planUpdate) {
+                return (
+                    <div className="mt-3 pt-2 border-t border-white/10 text-xs text-primary flex items-center gap-1.5 font-bold uppercase tracking-wide">
+                        <Sparkles className="w-3 h-3" />
+                        Plan updated
+                    </div>
+                );
+            }
+            return null;
+        }
+
+        const badge = ACTION_BADGES[msg.action];
+        if (!badge) return null;
+
+        const Icon = badge.icon;
+        return (
+            <div className={`mt-3 pt-2 border-t border-white/10 text-xs flex items-center gap-1.5 font-bold uppercase tracking-wide ${badge.color}`}>
+                <Icon className="w-3 h-3" />
+                {badge.label}
+            </div>
+        );
     };
 
     return (
@@ -98,12 +184,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
                                 }`}
                         >
                             {msg.content}
-                            {msg.planUpdate && (
-                                <div className="mt-3 pt-2 border-t border-white/10 text-xs text-primary flex items-center gap-1.5 font-bold uppercase tracking-wide">
-                                    <Sparkles className="w-3 h-3" />
-                                    Plan updated
-                                </div>
-                            )}
+                            {msg.role === 'assistant' && renderActionBadge(msg)}
                         </div>
                     </div>
                 ))}
@@ -121,6 +202,24 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Quick Suggestions */}
+            {showSuggestions && messages.length <= 2 && (
+                <div className="px-4 pb-2">
+                    <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+                        {QUICK_SUGGESTIONS.map((suggestion, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                disabled={isLoading}
+                                className="flex-none px-3 py-1.5 text-xs font-medium rounded-full bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white hover:border-primary/30 transition-all whitespace-nowrap disabled:opacity-50"
+                            >
+                                {suggestion.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Input */}
             <div className="p-4 pb-8 bg-gradient-to-t from-[#0f172a] to-[#0f172a]/95 border-t border-white/5">
                 <div className="flex items-center gap-2 bg-slate-900/80 rounded-2xl px-2 py-2 border border-white/5 focus-within:border-primary/50 transition-colors">
@@ -129,12 +228,12 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate }) => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="Ask your coach for advice..."
+                        placeholder="Ask your coach anything..."
                         className="flex-1 bg-transparent text-white text-sm placeholder-slate-500 focus:outline-none px-3 font-medium"
                         disabled={isLoading}
                     />
                     <button
-                        onClick={sendMessage}
+                        onClick={() => sendMessage()}
                         disabled={!input.trim() || isLoading}
                         className="p-3 bg-primary rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-orange-900/20"
                     >

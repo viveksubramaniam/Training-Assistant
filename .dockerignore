@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Frontend (not needed in backend container)
+frontend/
+dist/
+
+# Node modules (installed fresh in container)
+node_modules
+backend/node_modules
+
+# Python venv (installed fresh in container)
+python-server/.venv
+python-server/__pycache__
+
+# Environment files (set via Render dashboard)
+.env
+backend/.env
+python-server/.env
+
+# IDE & misc
+.claude
+.vscode
+*.md

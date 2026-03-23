@@ -444,11 +444,19 @@ const ActivityDetailPage = ({ activity, onClose }) => {
                                 <div className="pt-4">
                                     <button
                                         onClick={async () => {
+                                            if (!details) {
+                                                console.error('Activity details not loaded yet');
+                                                return;
+                                            }
                                             setAiLoading(true);
                                             try {
+                                                const token = localStorage.getItem('authToken');
                                                 const res = await fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, {
                                                     method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${token}`
+                                                    },
                                                     credentials: 'include',
                                                     body: JSON.stringify({ activityData: details })
                                                 });

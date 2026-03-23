@@ -38,7 +38,7 @@ app.use(cors({
     credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.set('trust proxy', 1); // Trust first proxy (Railway load balancer)
 app.use(cookieSession({
