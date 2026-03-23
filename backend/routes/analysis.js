@@ -43,6 +43,9 @@ router.post('/:id/analysis', async (req, res) => {
 
         const analysisData = response.data;
 
+        // ── LLM Output Log ──
+        console.log(`[LLM-OUTPUT] [analyze] activityId=${activityId} | model=${analysisData.model || 'unknown'} | status=${analysisData.status || 'unknown'} | textPreview="${(analysisData.text || '').substring(0, 120)}" | timestamp=${new Date().toISOString()}`);
+
         // Save to database using abstraction layer
         const savedSummary = await db.saveSummary(activityId, analysisData);
 

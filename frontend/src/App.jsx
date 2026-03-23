@@ -42,10 +42,7 @@ const LoginScreen = () => {
       <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]"></div>
 
       <div className="relative z-10 flex flex-col items-center p-8 text-center max-w-sm">
-        <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 border border-primary/20 shadow-[0_0_30px_rgba(249,116,21,0.2)]">
-          <span className="material-symbols-outlined text-4xl text-primary">shadow</span>
-        </div>
-        <h1 className="text-4xl font-bold tracking-tight text-white mb-2">ECLIPSE <span className="text-primary">AI</span></h1>
+        <h1 className="text-4xl font-bold tracking-tight text-white mb-2">STRI<span className="text-primary">IVE</span></h1>
         <p className="text-slate-400 mb-12 text-lg font-medium">Your adaptive performance coach.</p>
 
         <StravaLoginButton onLogin={() => window.location.href = `${API_BASE_URL}/api/auth/strava/login`} />
@@ -80,6 +77,7 @@ const App = () => {
   const [syncing, setSyncing] = useState(false);
   const [activityFilter, setActivityFilter] = useState('All');
   const [showChat, setShowChat] = useState(false); // Global chat state
+  const [planVersion, setPlanVersion] = useState(0); // Increments to force DailyPlanTab re-render
 
   // Fetch initial data
   useEffect(() => {
@@ -192,7 +190,7 @@ const App = () => {
       <div className="flex-1 overflow-hidden relative bg-deep-slate">
         {activeTab === 'home' && (
           <div className="h-full overflow-y-auto hide-scrollbar pb-20">
-            <DailyPlanTab user={user} activities={activities} onNavigateToCalendar={() => setActiveTab('plan')} />
+            <DailyPlanTab key={planVersion} user={user} activities={activities} onNavigateToCalendar={() => setActiveTab('plan')} />
           </div>
         )}
 
@@ -302,7 +300,30 @@ const App = () => {
       <ChatWidget
         isOpen={showChat}
         onClose={() => setShowChat(false)}
-        onPlanUpdate={() => handleSync()} // Refresh plan on update? Or refetch plan
+        onPlanUpdate={() => {
+          // Refetch user data & force DailyPlanTab re-render
+          setPlanVersion(v => v + 1);
+          const token = localStorage.getItem('authToken');
+          if (token) {
+            fetch(`${API_BASE_URL}/api/user`, { headers: { 'Authorization': `Bearer ${token}` } })
+              .then(r => r.ok ? r.json() : null)
+              .then(data => { if (data) setUser(data); });
+          }
+        }}
+        onGoalChanged={() => {
+          // Refetch user data & force DailyPlanTab re-render when goals change
+          setPlanVersion(v => v + 1);
+          const token = localStorage.getItem('authToken');
+          if (token) {
+            Promise.all([
+              fetch(`${API_BASE_URL}/api/user`, { headers: { 'Authorization': `Bearer ${token}` } }),
+              fetch(`${API_BASE_URL}/api/activities`, { headers: { 'Authorization': `Bearer ${token}` } })
+            ]).then(async ([userRes, actRes]) => {
+              if (userRes.ok) setUser(await userRes.json());
+              if (actRes.ok) setActivities(await actRes.json());
+            });
+          }
+        }}
       />
 
       {/* Bottom Navigation Bar */}

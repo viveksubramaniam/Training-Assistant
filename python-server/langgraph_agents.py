@@ -32,6 +32,7 @@ class PlanState(TypedDict):
     weekly_plan: dict | None
     daily_plan: dict | None
     recent_activities: list | None
+    fitness_profile: dict | None
     
     # Readiness flags
     is_master_plan_ready: bool
@@ -305,6 +306,22 @@ def master_planning_agent(state: PlanState) -> PlanState:
         except:
             pass
     
+    # Build fitness profile context
+    fp = state.get('fitness_profile') or {}
+    fitness_context = "No fitness profile available"
+    if fp and fp.get('totalActivitiesAnalysed', 0) > 0:
+        pb_list = fp.get('personalBests', [])
+        pb_str = ', '.join([f"{pb['name']}: {pb.get('formatted', 'N/A')}" for pb in pb_list[:6]]) if pb_list else 'None recorded'
+        fitness_context = f"""Avg Weekly Distance (last 8 weeks): {fp.get('avgWeeklyDistanceKm', 'N/A')}km
+Avg Weekly Runs: {fp.get('avgWeeklyRuns', 'N/A')}
+Avg Pace: {fp.get('avgPaceMinKm', 'N/A')}/km
+Avg Heart Rate: {fp.get('avgHeartRate', 'N/A')} bpm
+Avg Suffer Score: {fp.get('avgSufferScore', 'N/A')}
+Longest Run (last 8 weeks): {fp.get('longestRunKm', 'N/A')}km
+Weekly Volume Trend: {fp.get('weeklyTrend', 'unknown')}
+Personal Bests: {pb_str}
+Total activities analysed: {fp.get('totalActivitiesAnalysed', 0)} over {fp.get('weeksAnalysed', 0)} weeks"""
+
     prompt = f"""Create a comprehensive {total_weeks}-week training master plan.
 
 GOAL: {goal.get('type', 'General Fitness')}
@@ -314,6 +331,11 @@ WORKOUT DAYS: {goal.get('preferredWorkoutDays', ['Sun', 'Tue', 'Thu'])}
 
 RECENT ACTIVITY:
 {activity_context}
+
+ATHLETE FITNESS PROFILE:
+{fitness_context}
+
+IMPORTANT: Use the athlete's fitness profile to calibrate the plan. Set workout paces relative to their average pace. If their avg pace is 6:00/km, easy runs should be ~6:15-6:30/km, tempo runs ~5:30-5:45/km. Use their weekly volume as the baseline — don't jump more than 10% per week. Consider their PBs when setting race-pace targets.
 
 Create a periodized plan with phases:
 1. Base Building (weeks 1-4): Foundation, easy aerobic volume
@@ -461,6 +483,23 @@ When applying this modification:
 4. Consider current training load when making changes
 """
     
+    # Build fitness profile context for weekly planner
+    fp = state.get('fitness_profile') or {}
+    weekly_fitness_context = ""
+    if fp and fp.get('totalActivitiesAnalysed', 0) > 0:
+        pb_list = fp.get('personalBests', [])
+        pb_str = ', '.join([f"{pb['name']}: {pb.get('formatted', 'N/A')}" for pb in pb_list[:6]]) if pb_list else 'None recorded'
+        weekly_fitness_context = f"""
+ATHLETE FITNESS PROFILE:
+Avg Pace: {fp.get('avgPaceMinKm', 'N/A')}/km
+Avg Weekly Distance: {fp.get('avgWeeklyDistanceKm', 'N/A')}km
+Avg Heart Rate: {fp.get('avgHeartRate', 'N/A')} bpm
+Longest Run: {fp.get('longestRunKm', 'N/A')}km
+Personal Bests: {pb_str}
+
+IMPORTANT: Use this profile to set REALISTIC paces. Easy runs should be 30-60s slower than avg pace. Tempo should be 10-20s faster than avg pace. Long runs at avg pace or slightly slower. Do NOT set paces the athlete cannot sustain.
+"""
+
     prompt = f"""Create a detailed 7-day running schedule.
 
 WEEK: {current_week} (starting {week_start.strftime('%Y-%m-%d')})
@@ -470,6 +509,7 @@ GOAL: {goal.get('type', 'General Fitness')}
 WEEKLY TARGET: {goal.get('weeklyTarget', 40)}km
 {completed_days_info}
 {modification_context}
+{weekly_fitness_context}
 
 Create exactly 7 days with varied workouts. Include a balanced workout, easy runs, tempo runs, long runs, and intervals.
 But always stick to the weekly target and the days of the week that user wants to run.
@@ -804,6 +844,7 @@ def orchestrate_plans(
     master_plan: dict | None = None,
     weekly_plan: dict | None = None,
     recent_activities: list | None = None,
+    fitness_profile: dict | None = None,
     force_regenerate: bool = False
 ) -> dict:
     """
@@ -815,6 +856,7 @@ def orchestrate_plans(
         master_plan: Long-term training plan
         weekly_plan: Existing weekly plan (if cached)
         recent_activities: Recent workout activities
+        fitness_profile: Aggregated fitness metrics (avg pace, PBs, etc.)
         force_regenerate: Force regeneration of all plans
     
     Returns:
@@ -828,6 +870,7 @@ def orchestrate_plans(
         "weekly_plan": weekly_plan if not force_regenerate else None,
         "daily_plan": None,
         "recent_activities": recent_activities,
+        "fitness_profile": fitness_profile,
         "is_master_plan_ready": False if force_regenerate else (master_plan is not None and bool(master_plan.get("weeks")) if master_plan else False),
         "is_weekly_plan_ready": weekly_plan is not None and not force_regenerate,
         "is_daily_plan_ready": False,

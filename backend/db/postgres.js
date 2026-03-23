@@ -955,11 +955,11 @@ export const getActivitySummary = async (userId) => {
 /**
  * Get coach chat history for a user
  */
-export const getCoachHistory = async (userId, limit = 10) => {
+export const getCoachHistory = async (userId, limit = 50) => {
     try {
         const result = await pool.query(`
-            SELECT role, message, created_at
-            FROM coach_messages 
+            SELECT role, message, context, created_at
+            FROM coach_conversations 
             WHERE user_id = $1 
             ORDER BY created_at DESC 
             LIMIT $2
@@ -967,7 +967,6 @@ export const getCoachHistory = async (userId, limit = 10) => {
 
         return result.rows.reverse(); // Return in chronological order
     } catch (err) {
-        // Table might not exist - return empty array
         console.error('Error getting coach history:', err.message);
         return [];
     }
@@ -979,11 +978,10 @@ export const getCoachHistory = async (userId, limit = 10) => {
 export const saveCoachMessage = async (userId, role, message, context = null) => {
     try {
         await pool.query(`
-            INSERT INTO coach_messages (user_id, role, message, context)
+            INSERT INTO coach_conversations (user_id, role, message, context)
             VALUES ($1, $2, $3, $4)
         `, [userId, role, message, context ? JSON.stringify(context) : null]);
     } catch (err) {
-        // Table might not exist - silently fail
         console.error('Error saving coach message:', err.message);
     }
 };
@@ -1066,5 +1064,137 @@ export const getRecentActivities = async (userId, limit = 7) => {
         return [];
     }
 };
+
+/**
+ * Get comprehensive fitness profile for AI plan personalization.
+ * Aggregates last 8 weeks of running data + personal bests from activity_details.
+ * 
+ * @param {string} userId - User ID
+ * @returns {Object} Fitness profile with averages, trend, and PBs
+ */
+export const getFitnessProfile = async (userId) => {
+    try {
+        // 1. Aggregate running stats over the last 8 weeks
+        const statsResult = await pool.query(`
+            WITH weekly AS (
+                SELECT 
+                    date_trunc('week', start_date) AS week,
+                    SUM(distance) AS week_distance,
+                    COUNT(*) AS week_runs,
+                    AVG(CASE WHEN average_speed > 0 THEN 1000.0 / average_speed / 60.0 ELSE NULL END) AS avg_pace_min_km,
+                    AVG(average_heartrate) AS avg_hr,
+                    AVG(suffer_score) AS avg_suffer,
+                    MAX(distance) AS longest_run
+                FROM activities
+                WHERE user_id = $1
+                  AND sport_type IN ('Run', 'TrailRun', 'VirtualRun')
+                  AND start_date > NOW() - INTERVAL '8 weeks'
+                GROUP BY date_trunc('week', start_date)
+                ORDER BY week
+            )
+            SELECT 
+                COUNT(*) AS num_weeks,
+                COALESCE(AVG(week_distance), 0) AS avg_weekly_distance,
+                COALESCE(AVG(week_runs), 0) AS avg_weekly_runs,
+                COALESCE(AVG(avg_pace_min_km), 0) AS avg_pace_min_km,
+                COALESCE(AVG(avg_hr), 0) AS avg_hr,
+                COALESCE(AVG(avg_suffer), 0) AS avg_suffer,
+                COALESCE(MAX(longest_run), 0) AS longest_run,
+                SUM(week_runs) AS total_activities,
+                -- Trend: compare last 4 weeks avg vs first 4 weeks avg
+                COALESCE(
+                    AVG(CASE WHEN week >= NOW() - INTERVAL '4 weeks' THEN week_distance END), 0
+                ) AS recent_avg,
+                COALESCE(
+                    AVG(CASE WHEN week < NOW() - INTERVAL '4 weeks' THEN week_distance END), 0
+                ) AS earlier_avg
+            FROM weekly
+        `, [userId]);
+
+        const stats = statsResult.rows[0];
+
+        // 2. Get personal bests from activity_details.best_efforts
+        //    Best efforts are stored as JSONB arrays in each activity's detail record.
+        //    We pick the fastest time for each standard distance.
+        const pbResult = await pool.query(`
+            SELECT DISTINCT ON (effort->>'name')
+                effort->>'name' AS name,
+                (effort->>'elapsed_time')::int AS elapsed_time,
+                (effort->>'distance')::real AS distance,
+                a.start_date AS activity_date
+            FROM activity_details ad
+            JOIN activities a ON a.strava_activity_id = ad.activity_id
+            CROSS JOIN LATERAL jsonb_array_elements(ad.best_efforts) AS effort
+            WHERE a.user_id = $1
+              AND effort->>'elapsed_time' IS NOT NULL
+            ORDER BY effort->>'name', (effort->>'elapsed_time')::int ASC
+        `, [userId]);
+
+        const personalBests = pbResult.rows.map(row => ({
+            name: row.name,
+            elapsed_time: row.elapsed_time,
+            distance: row.distance,
+            date: row.activity_date,
+            formatted: formatTime(row.elapsed_time)
+        }));
+
+        // 3. Compute trend
+        const recentAvg = parseFloat(stats.recent_avg) || 0;
+        const earlierAvg = parseFloat(stats.earlier_avg) || 0;
+        let weeklyTrend = 'stable';
+        if (earlierAvg > 0) {
+            const changePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+            if (changePercent > 10) weeklyTrend = 'increasing';
+            else if (changePercent < -10) weeklyTrend = 'decreasing';
+        }
+
+        // 4. Format pace as mm:ss
+        const paceDecimal = parseFloat(stats.avg_pace_min_km) || 0;
+        const paceMin = Math.floor(paceDecimal);
+        const paceSec = Math.round((paceDecimal - paceMin) * 60);
+        const avgPaceFormatted = paceDecimal > 0 ? `${paceMin}:${String(paceSec).padStart(2, '0')}` : 'N/A';
+
+        return {
+            avgWeeklyDistanceKm: Math.round((parseFloat(stats.avg_weekly_distance) || 0) / 1000 * 10) / 10,
+            avgWeeklyRuns: Math.round((parseFloat(stats.avg_weekly_runs) || 0) * 10) / 10,
+            avgPaceMinKm: avgPaceFormatted,
+            avgHeartRate: Math.round(parseFloat(stats.avg_hr) || 0),
+            avgSufferScore: Math.round(parseFloat(stats.avg_suffer) || 0),
+            longestRunKm: Math.round((parseFloat(stats.longest_run) || 0) / 1000 * 10) / 10,
+            personalBests,
+            weeklyTrend,
+            totalActivitiesAnalysed: parseInt(stats.total_activities) || 0,
+            weeksAnalysed: parseInt(stats.num_weeks) || 0
+        };
+    } catch (err) {
+        console.error('Error building fitness profile:', err.message);
+        return {
+            avgWeeklyDistanceKm: 0,
+            avgWeeklyRuns: 0,
+            avgPaceMinKm: 'N/A',
+            avgHeartRate: 0,
+            avgSufferScore: 0,
+            longestRunKm: 0,
+            personalBests: [],
+            weeklyTrend: 'unknown',
+            totalActivitiesAnalysed: 0,
+            weeksAnalysed: 0
+        };
+    }
+};
+
+/**
+ * Format seconds into mm:ss or hh:mm:ss
+ */
+function formatTime(totalSeconds) {
+    if (!totalSeconds || totalSeconds <= 0) return 'N/A';
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 // End of file

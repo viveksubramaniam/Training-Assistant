@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from './config/api';
-import { Target, Edit3, Zap, TrendingUp, Heart, Clock, ChevronRight } from 'lucide-react';
+import { Target, Edit3, Zap, TrendingUp, Heart, Clock, ChevronRight, LogOut } from 'lucide-react';
 import GoalEditorModal from './GoalEditorModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import PlanCreatingLoader from './components/PlanCreatingLoader';
@@ -214,6 +214,17 @@ const ProfilePage = ({ user, activities }) => {
                     <h1 className="text-2xl font-bold text-white">
                         Hello, <span className="text-primary">{user?.name?.split(' ')[0] || 'Athlete'}!</span>
                     </h1>
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem('authToken');
+                            localStorage.removeItem('trainingGoal');
+                            window.location.reload();
+                        }}
+                        className="p-2 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors"
+                        title="Log out"
+                    >
+                        <LogOut className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Tab Switcher */}

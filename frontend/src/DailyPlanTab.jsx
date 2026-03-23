@@ -221,11 +221,8 @@ const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
             <header className="sticky top-0 z-50 border-none bg-gradient-to-b from-[#0f172a] via-[#0f172a]/80 to-transparent pb-4">
                 <div className="max-w-md mx-auto px-5 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-white border border-primary/20 shadow-lg shadow-primary/10">
-                            <span className="material-symbols-outlined text-2xl font-bold text-primary">shadow</span>
-                        </div>
                         <div>
-                            <h1 className="text-base font-bold tracking-tight text-white">ECLIPSE <span className="text-primary">V2</span></h1>
+                            <h1 className="text-base font-bold tracking-tight text-white">STRI<span className="text-primary">IVE</span></h1>
                             <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Adaptive Coach</p>
                         </div>
                     </div>
