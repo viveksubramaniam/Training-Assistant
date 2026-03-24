@@ -183,7 +183,7 @@ const ActivityDetailPage = ({ activity, onClose }) => {
 
         return (
             <MapContainer center={center} zoom={13} style={{ height: '192px', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false} attributionControl={false}>
-                <TileLayer url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png" />
+                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
                 <Polyline positions={positions} color="#f97415" weight={3} opacity={0.9} />
                 <Recenter positions={positions} />
             </MapContainer>
