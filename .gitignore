@@ -39,3 +39,9 @@ yarn-error.log*
 
 # Python Venv
 server/ai_service/venv
+
+
+./claude.md
+./.claude/settings.json
+./.env.render
+./TEST_AGENT_RUNBOOK.md
