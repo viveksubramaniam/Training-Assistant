@@ -47,8 +47,10 @@ export const ensureValidToken = async (user) => {
             await db.saveUser(user);
             console.log('Token refreshed and saved successfully.');
         } catch (error) {
-            console.error('Critical Error: Failed to refresh token in helper:', error.message);
-            throw new Error('Failed to refresh authentication token');
+            console.error('Token refresh failed for user:', user.stravaId, error.message);
+            const err = new Error('Token refresh failed. Please re-authenticate with Strava.');
+            err.code = 'REAUTH_REQUIRED';
+            throw err;
         }
     }
     return user;
