@@ -36,7 +36,7 @@ router.post('/sync', requireAuth, async (req, res) => {
     try {
         await ensureValidToken(user);
     } catch (err) {
-        return res.status(401).json({ error: 'Authentication failed: ' + err.message });
+        return res.status(401).json({ error: 'Authentication failed: ' + err.message, code: err.code });
     }
 
     const { fullSync } = req.body;
@@ -171,7 +171,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     try {
         await ensureValidToken(user);
     } catch (err) {
-        return res.status(401).json({ error: 'Authentication failed: ' + err.message });
+        return res.status(401).json({ error: 'Authentication failed: ' + err.message, code: err.code });
     }
 
     try {

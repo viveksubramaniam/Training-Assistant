@@ -158,6 +158,10 @@ const App = () => {
 
         if (actRes.ok) setActivities(await actRes.json());
         if (userRes.ok) setUser(await userRes.json());
+      } else if (res.status === 401) {
+        // Token refresh failed — user needs to re-authenticate
+        localStorage.removeItem('authToken');
+        setUser(null);
       }
     } catch (err) {
       console.error("Sync failed", err);
