@@ -12,7 +12,7 @@ const router = express.Router();
  */
 router.get('/login', (req, res) => {
     console.log('[GET] /api/auth/strava/login - Initiating Strava Login');
-    const redirectUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${STRAVA_REDIRECT_URI}&approval_prompt=auto&scope=${STRAVA_SCOPES}`;
+    const redirectUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${STRAVA_REDIRECT_URI}&approval_prompt=force&scope=${STRAVA_SCOPES}`;
     console.log('Redirecting to:', redirectUrl);
     res.redirect(redirectUrl);
 });
