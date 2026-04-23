@@ -184,11 +184,30 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         <div style={{
             position: 'fixed',
             inset: 0,
-            background: 'var(--color-bg)',
+            background: 'rgba(0, 0, 0, 0.4)',
             zIndex: 50,
             display: 'flex',
             flexDirection: 'column',
+            justifyContent: 'flex-end',
         }}>
+            {/* Backdrop overlay */}
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                cursor: 'pointer',
+            }} onClick={onClose} />
+
+            {/* Chat container - not fullscreen, contained modal */}
+            <div style={{
+                position: 'relative',
+                background: 'var(--color-bg)',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '85vh',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                maxWidth: '100%',
+            }}>
             {/* Header */}
             <div style={{
                 height: 60,
@@ -443,6 +462,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                         </svg>
                     </button>
                 </div>
+            </div>
             </div>
         </div>
     );
