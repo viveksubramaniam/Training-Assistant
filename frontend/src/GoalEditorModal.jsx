@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Target, Calendar, MapPin, Check } from 'lucide-react';
 
-/**
- * GoalEditorModal - Modal for creating/editing training goals
- */
 export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave }) {
     const [goalType, setGoalType] = useState('Half Marathon');
     const [targetDate, setTargetDate] = useState('');
     const [weeklyTarget, setWeeklyTarget] = useState(40);
     const [preferredDays, setPreferredDays] = useState(['Mon', 'Wed', 'Fri', 'Sun']);
     const [saving, setSaving] = useState(false);
+    const [inputFocused, setInputFocused] = useState(null);
 
     const goalTypes = ['5K', '10K', 'Half Marathon', 'Marathon', 'General Fitness'];
     const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -45,52 +42,102 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(8px)',
+                }}
             />
 
             {/* Modal */}
-            <div className="relative bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl">
+            <div style={{
+                position: 'relative',
+                borderRadius: 24,
+                padding: 32,
+                width: '100%',
+                maxWidth: 448,
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-line)',
+            }}>
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
+                    style={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        padding: 8,
+                        borderRadius: '50%',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--color-fg-dim)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
                 >
-                    <X className="w-5 h-5 text-slate-400" />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
 
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-[#f97415]/20 flex items-center justify-center">
-                        <Target className="w-6 h-6 text-[#f97415]" />
+                <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+                    <div style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'color-mix(in oklch, var(--color-ignite) 15%, transparent)',
+                    }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ color: 'var(--color-ignite)' }}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="font-display font-bold" style={{ fontSize: 20, color: 'var(--color-fg)' }}>
                             {existingGoal ? 'Edit Goal' : 'Set Your Goal'}
                         </h2>
-                        <p className="text-sm text-slate-400">Define your training target</p>
+                        <p style={{ fontSize: 13, color: 'var(--color-fg-dim)', marginTop: 4 }}>Define your training target</p>
                     </div>
                 </div>
 
                 {/* Form */}
-                <div className="space-y-5">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {/* Goal Type */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                        <label className="mono-data" style={{
+                            display: 'block',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            color: 'var(--color-fg-dim)',
+                            marginBottom: 8,
+                        }}>
                             Goal Type
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                             {goalTypes.map(type => (
                                 <button
                                     key={type}
                                     onClick={() => setGoalType(type)}
-                                    className={`py-3 px-4 rounded-xl text-sm font-semibold transition-all ${goalType === type
-                                        ? 'bg-[#f97415] text-white'
-                                        : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
-                                        }`}
+                                    style={{
+                                        padding: '12px 16px',
+                                        borderRadius: 12,
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        transition: 'all 0.15s',
+                                        background: goalType === type ? 'var(--color-ignite)' : 'var(--color-surface-2)',
+                                        color: goalType === type ? 'white' : 'var(--color-fg-muted)',
+                                        border: goalType === type ? 'none' : '1px solid var(--color-line)',
+                                        cursor: 'pointer',
+                                    }}
                                 >
                                     {type}
                                 </button>
@@ -100,29 +147,69 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
 
                     {/* Target Date */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                            <Calendar className="w-4 h-4 inline mr-1" />
+                        <label className="mono-data" style={{
+                            display: 'block',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            color: 'var(--color-fg-dim)',
+                            marginBottom: 8,
+                        }}>
                             Target Date (Optional)
                         </label>
                         <input
                             type="date"
                             value={targetDate}
                             onChange={(e) => setTargetDate(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#f97415]/50"
+                            onFocus={() => setInputFocused('targetDate')}
+                            onBlur={() => setInputFocused(null)}
+                            style={{
+                                width: '100%',
+                                background: 'var(--color-surface-2)',
+                                border: `1px solid ${inputFocused === 'targetDate' ? 'var(--color-ignite)' : 'var(--color-line)'}`,
+                                borderRadius: 12,
+                                padding: '12px 16px',
+                                color: 'var(--color-fg)',
+                                fontSize: 14,
+                                outline: 'none',
+                                transition: 'border-color 0.15s',
+                                boxSizing: 'border-box',
+                            }}
                         />
                     </div>
 
                     {/* Weekly Distance Target */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                            <MapPin className="w-4 h-4 inline mr-1" />
+                        <label className="mono-data" style={{
+                            display: 'block',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            color: 'var(--color-fg-dim)',
+                            marginBottom: 8,
+                        }}>
                             Weekly Distance Target (km)
                         </label>
                         <input
                             type="number"
                             value={weeklyTarget}
                             onChange={(e) => setWeeklyTarget(parseInt(e.target.value) || 0)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#f97415]/50"
+                            onFocus={() => setInputFocused('weeklyTarget')}
+                            onBlur={() => setInputFocused(null)}
+                            style={{
+                                width: '100%',
+                                background: 'var(--color-surface-2)',
+                                border: `1px solid ${inputFocused === 'weeklyTarget' ? 'var(--color-ignite)' : 'var(--color-line)'}`,
+                                borderRadius: 12,
+                                padding: '12px 16px',
+                                color: 'var(--color-fg)',
+                                fontSize: 14,
+                                outline: 'none',
+                                transition: 'border-color 0.15s',
+                                boxSizing: 'border-box',
+                            }}
                             min="0"
                             max="200"
                         />
@@ -130,18 +217,35 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
 
                     {/* Preferred Workout Days */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                        <label className="mono-data" style={{
+                            display: 'block',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            color: 'var(--color-fg-dim)',
+                            marginBottom: 8,
+                        }}>
                             Preferred Workout Days
                         </label>
-                        <div className="flex gap-2">
+                        <div style={{ display: 'flex', gap: 8 }}>
                             {allDays.map(day => (
                                 <button
                                     key={day}
                                     onClick={() => toggleDay(day)}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${preferredDays.includes(day)
-                                        ? 'bg-[#f97415] text-white'
-                                        : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'
-                                        }`}
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: 8,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        transition: 'all 0.15s',
+                                        background: preferredDays.includes(day) ? 'var(--color-ignite)' : 'var(--color-surface-2)',
+                                        color: preferredDays.includes(day) ? 'white' : 'var(--color-fg-muted)',
+                                        border: preferredDays.includes(day) ? 'none' : '1px solid var(--color-line)',
+                                        cursor: 'pointer',
+                                    }}
                                 >
                                     {day.charAt(0)}
                                 </button>
@@ -151,26 +255,48 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 mt-8">
+                <div style={{ display: 'flex', gap: 12, marginTop: 32 }}>
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-slate-300 font-semibold hover:bg-white/5 transition-all"
+                        style={{
+                            flex: 1,
+                            padding: '12px 16px',
+                            borderRadius: 12,
+                            border: '1px solid var(--color-line)',
+                            background: 'transparent',
+                            color: 'var(--color-fg-muted)',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = 'var(--color-surface-2)'}
+                        onMouseLeave={(e) => e.target.style.background = 'transparent'}
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex-1 py-3 px-4 rounded-xl bg-[#f97415] text-white font-bold hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        style={{
+                            flex: 1,
+                            padding: '12px 16px',
+                            borderRadius: 12,
+                            background: 'var(--color-ignite)',
+                            color: 'white',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            transition: 'opacity 0.15s',
+                            opacity: saving ? 0.6 : 1,
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                        }}
                     >
-                        {saving ? (
-                            'Saving...'
-                        ) : (
-                            <>
-                                <Check className="w-5 h-5" />
-                                Save Goal
-                            </>
-                        )}
+                        {saving ? 'Saving...' : 'Save Goal'}
                     </button>
                 </div>
             </div>

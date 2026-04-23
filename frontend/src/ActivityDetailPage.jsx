@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from './config/api';
-import { ArrowLeft, Share, MoreVertical, Zap, Activity, Flame, Heart, Timer, TrendingUp, Mountain, Thermometer, Footprints, Sparkles, Loader2 } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import polyline from '@mapbox/polyline';
 
-// Rolling average helper for smooth charts
+/* --------------------------------------------------------------
+   Activity Detail · Striive v2
+   Map hero · 6-stat grid · HR trace · Coach insight
+   -------------------------------------------------------------- */
+
 const rollingAverage = (data, windowSize = 15) => {
     if (!data || data.length === 0) return data;
     const result = [];
@@ -18,516 +20,364 @@ const rollingAverage = (data, windowSize = 15) => {
     return result;
 };
 
-const ActivityDetailPage = ({ activity, onClose }) => {
+const Recenter = ({ positions }) => {
+    const map = useMap();
+    useEffect(() => { if (positions.length) map.fitBounds(positions, { padding: [18, 18] }); }, [positions, map]);
+    return null;
+};
+
+const tagForType = (type, name = '') => {
+    const t = `${type || ''} ${name || ''}`.toLowerCase();
+    if (/threshold|tempo/.test(t)) return 'Threshold';
+    if (/interval|vo2|sprint|hill/.test(t)) return 'Intervals';
+    if (/long/.test(t)) return 'Long';
+    if (/easy|recovery|shake/.test(t)) return 'Easy';
+    if (/ride|cycle|bike/.test(t)) return 'Ride';
+    if (/lift|strength|weight/.test(t)) return 'Strength';
+    return (type || 'Session').toUpperCase();
+};
+
+const formatDuration = (seconds, fallback = '—') => {
+    if (!seconds || seconds <= 0) return fallback;
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    const h = Math.floor(m / 60);
+    const mm = (m % 60).toString().padStart(2, '0');
+    const ss = s.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+};
+
+const formatPaceFromSpeed = (speedMps) => {
+    if (!speedMps || speedMps <= 0) return '—';
+    const secPerKm = 1000 / speedMps;
+    const m = Math.floor(secPerKm / 60);
+    const s = Math.round(secPerKm % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
+/* --------------------------------------------------------------
+   HR Trace — inline SVG area chart
+   -------------------------------------------------------------- */
+
+const FALLBACK_HR_PATH = 'M0 45 L20 42 L40 30 L60 12 L80 30 L100 28 L115 10 L130 28 L145 26 L160 8 L175 26 L190 24 L205 6 L220 24 L240 34 L260 40 L280 42 L300 45';
+
+const HRTrace = ({ data }) => {
+    if (!data || data.length < 2) {
+        return (
+            <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none" style={{ marginTop: 8 }}>
+                <path d={FALLBACK_HR_PATH} stroke="var(--color-crimson)" strokeWidth="1.5" fill="none"/>
+                <path d={`${FALLBACK_HR_PATH} L300 60 L0 60 Z`} fill="var(--color-crimson)" opacity="0.15"/>
+            </svg>
+        );
+    }
+
+    const W = 300, H = 60;
+    const clean = data.filter(v => v !== null && v !== undefined);
+    const min = Math.min(...clean);
+    const max = Math.max(...clean);
+    const span = Math.max(1, max - min);
+
+    const stepX = W / (data.length - 1);
+    let d = '';
+    data.forEach((v, i) => {
+        const x = i * stepX;
+        const y = v == null ? H : H - 4 - ((v - min) / span) * (H - 8);
+        d += `${i === 0 ? 'M' : ' L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+
+    return (
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ marginTop: 8 }}>
+            <path d={d} stroke="var(--color-crimson)" strokeWidth="1.5" fill="none"/>
+            <path d={`${d} L${W} ${H} L0 ${H} Z`} fill="var(--color-crimson)" opacity="0.15"/>
+        </svg>
+    );
+};
+
+/* --------------------------------------------------------------
+   Component
+   -------------------------------------------------------------- */
+
+const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('analysis'); // analysis, splits, segments
     const [aiSummary, setAiSummary] = useState(null);
     const [aiLoading, setAiLoading] = useState(false);
 
     useEffect(() => {
+        if (!activity?.id) { setLoading(false); return; }
         const fetchData = async () => {
-            console.log('[ActivityDetailPage] Fetching details for activity:', activity.id);
             try {
                 const token = localStorage.getItem('authToken');
-                const headers = {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                };
-
-                // Fetch activity details and AI summary in parallel
+                const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
                 const [detailsRes, summaryRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/activities/${activity.id}`, {
-                        headers,
-                        credentials: 'include'
-                    }),
-                    fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, {
-                        headers,
-                        credentials: 'include'
-                    }).catch(() => null)
+                    fetch(`${API_BASE_URL}/api/activities/${activity.id}`, { headers, credentials: 'include' }),
+                    fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, { headers, credentials: 'include' }).catch(() => null),
                 ]);
-
-                console.log('[ActivityDetailPage] API Response status:', detailsRes.status);
-                if (detailsRes.ok) {
-                    const data = await detailsRes.json();
-                    console.log('[ActivityDetailPage] Received data:', {
-                        id: data.id,
-                        hasMap: !!data.map,
-                        hasStreams: !!data.streams,
-                        streamKeys: data.streams ? Object.keys(data.streams) : [],
-                        calories: data.calories,
-                        zones: data.zones?.length || 0
-                    });
-                    setDetails(data);
-                } else {
-                    console.error('[ActivityDetailPage] API call failed:', detailsRes.status, await detailsRes.text());
-                }
-
-                // Load AI summary if available
+                if (detailsRes.ok) setDetails(await detailsRes.json());
                 if (summaryRes?.ok) {
-                    const summaryData = await summaryRes.json();
-                    if (summaryData.versions && summaryData.versions.length > 0) {
-                        const latest = summaryData.versions[summaryData.versions.length - 1];
-                        try {
-                            const parsed = JSON.parse(latest.text);
-                            setAiSummary(parsed);
-                        } catch (e) {
-                            setAiSummary({ summary: latest.text });
-                        }
+                    const sData = await summaryRes.json();
+                    if (sData.versions?.length > 0) {
+                        const latest = sData.versions[sData.versions.length - 1];
+                        try { setAiSummary(JSON.parse(latest.text)); }
+                        catch { setAiSummary({ summary: latest.text }); }
                     }
                 }
             } catch (err) {
-                console.error("[ActivityDetailPage] Failed to load activity details", err);
+                console.error('Activity detail load failed', err);
             } finally {
                 setLoading(false);
             }
         };
-        if (activity?.id) {
-            fetchData();
-        } else {
-            console.warn('[ActivityDetailPage] No activity.id provided');
-            setLoading(false);
-        }
+        fetchData();
     }, [activity]);
 
     if (!activity) return null;
 
-    const isRun = activity.type === 'Run';
-    // Show map for any activity that has polyline data, not just runs
-    const hasMap = !!(details?.map?.summary_polyline || details?.map?.polyline);
+    /* ----- Derived values ----- */
+    const hasPolyline = !!(details?.map?.summary_polyline || details?.map?.polyline);
+    const polyEncoded = details?.map?.summary_polyline || details?.map?.polyline;
+    const positions = hasPolyline ? polyline.decode(polyEncoded) : null;
 
-    // --- Data Formatting Helpers ---
+    const distanceKm = activity.distance ? (activity.distance / 1000).toFixed(1) : '—';
+    const movingStr = formatDuration(details?.moving_time || activity.moving_time);
+    const avgPace = formatPaceFromSpeed(details?.average_speed || activity.average_speed);
+    const avgHr = details?.average_heartrate || activity.average_heartrate;
+    const maxHr = details?.max_heartrate;
+    const elevation = details?.total_elevation_gain != null ? Math.round(details.total_elevation_gain) : '—';
+    const calories = details?.calories || '—';
 
-    // Distance (Meters -> KM)
-    const distanceKm = (activity.distance / 1000).toFixed(2);
+    const dateObj = new Date(activity.start_date || activity.date);
+    const dateStr = !isNaN(dateObj)
+        ? dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        : 'Unknown Date';
 
-    // Date
-    const dateObj = new Date(activity.start_date || activity.date); // Handle both formats
-    const dateStr = !isNaN(dateObj) ? dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Unknown Date';
+    const eyebrowLabel = tagForType(activity.type, activity.name);
 
-    // Telemetry Data Preparation
-    const streams = details?.streams || {};
-    const hasHeartRate = !!streams.heartrate?.data;
-    const hasVelocity = !!streams.velocity_smooth?.data;
-
-    console.log('[ActivityDetailPage] Stream analysis:', {
-        streamKeys: Object.keys(streams),
-        heartrateStructure: streams.heartrate ? Object.keys(streams.heartrate) : 'missing',
-        velocityStructure: streams.velocity_smooth ? Object.keys(streams.velocity_smooth) : 'missing',
-        hasHeartRate,
-        hasVelocity,
-        heartrateDataLength: streams.heartrate?.data?.length,
-        velocityDataLength: streams.velocity_smooth?.data?.length
-    });
-
-    // Combine streams for chart with SMOOTHING
-    const rawHr = streams.heartrate?.data || [];
-    const rawVelocity = streams.velocity_smooth?.data || [];
-
-    // Apply rolling average for smoother curves (window of 20 points)
+    // HR trace sampled from streams
+    const rawHr = details?.streams?.heartrate?.data || [];
     const smoothedHr = rollingAverage(rawHr, 20);
-    const smoothedVelocity = rollingAverage(rawVelocity, 20);
+    const sampleRate = Math.max(1, Math.floor(smoothedHr.length / 120));
+    const hrTrace = smoothedHr.filter((_, i) => i % sampleRate === 0);
 
-    // Convert velocity to pace and sample every Nth point for performance
-    const sampleRate = Math.max(1, Math.floor(rawHr.length / 200)); // Max 200 points
+    const coachHeadline = aiSummary?.highlight || aiSummary?.summary
+        || "Review this session with your coach for insights on pacing and effort distribution.";
 
-    const chartData = (hasHeartRate || hasVelocity) ?
-        smoothedHr.map((_, i) => ({
-            i,
-            hr: smoothedHr[i],
-            pace: smoothedVelocity[i] ? (16.666 / (smoothedVelocity[i] || 0.1)) : null
-        })).filter((_, i) => i % sampleRate === 0) : null;
-
-    // Filter out crazy pace spikes for chart clarity (e.g. > 20 min/km which is walking/stopped)
-    const cleanChartData = chartData?.map(d => ({
-        ...d,
-        pace: d.pace && d.pace < 20 ? d.pace : null
-    }));
-
-    console.log('[ActivityDetailPage] Chart data:', {
-        chartDataLength: chartData?.length,
-        cleanChartDataLength: cleanChartData?.length,
-        hasMap,
-        mapPolyline: !!details?.map?.polyline,
-        mapSummaryPolyline: !!details?.map?.summary_polyline
-    });
-
-    // --- Mock Data Generators (replacing hardcoded values from HTML) ---
-    // If we have actual zones from API (details.zones), use them. Else mock.
-    const hrZonesSource = details?.zones?.[0]?.distribution_buckets || [];
-
-    const hrDistribution = hrZonesSource.length > 0 ? hrZonesSource.map((bucket, i) => ({
-        name: `Z${i + 1}`,
-        value: Math.round((bucket.time / activity.moving_time) * 100) || 0, // % of total time
-        color: ['#94a3b8', '#3b82f6', '#10b981', '#f97415', '#ef4444'][i] || '#94a3b8',
-        label: new Date(bucket.time * 1000).toISOString().substr(14, 5) // Format seconds to MM:SS
-    })).reverse() : [
-        // Fallback Mock
-        { name: 'Z5', value: 15, color: '#ef4444', label: '08:12' },
-        { name: 'Z4', value: 60, color: '#f97415', label: '32:45' },
-        { name: 'Z3', value: 20, color: '#10b981', label: '11:05' },
-        { name: 'Z2', value: 5, color: '#3b82f6', label: '02:30' },
-        { name: 'Z1', value: 0, color: '#94a3b8', label: '00:00' },
-    ];
-
-    const HeroMap = ({ mapPolyline }) => {
-        if (!mapPolyline) return <div className="h-48 bg-slate-800 w-full animate-pulse"></div>;
-        const positions = polyline.decode(mapPolyline);
-        const center = positions[Math.floor(positions.length / 2)];
-
-        const Recenter = ({ positions }) => {
-            const map = useMap();
-            useEffect(() => { if (positions.length) map.fitBounds(positions); }, [positions, map]);
-            return null;
-        };
-
-        return (
-            <MapContainer center={center} zoom={13} style={{ height: '192px', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false} attributionControl={false}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                <Polyline positions={positions} color="#f97415" weight={3} opacity={0.9} />
-                <Recenter positions={positions} />
-            </MapContainer>
-        );
+    const generateAnalysis = async () => {
+        if (!details) return;
+        setAiLoading(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                credentials: 'include',
+                body: JSON.stringify({ activityData: details }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.versions?.length > 0) {
+                    const latest = data.versions[data.versions.length - 1];
+                    try { setAiSummary(JSON.parse(latest.text)); }
+                    catch { setAiSummary({ summary: latest.text }); }
+                }
+            }
+        } catch (err) {
+            console.error('AI analysis failed', err);
+        } finally {
+            setAiLoading(false);
+        }
     };
 
-    const ActivityStat = ({ label, value, unit }) => (
-        <div className="flex flex-col">
-            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight truncate">{label}</p>
-            <p className="text-[14px] font-bold font-mono text-white tracking-tight">
-                {value}<span className="text-[10px] ml-0.5 opacity-50 font-normal">{unit}</span>
-            </p>
-        </div>
-    );
-
-    // Formatting Helpers
-    const formatDuration = (seconds) => {
-        if (!seconds) return activity.duration || '--:--'; // Fallback to formatted string if exists
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        return h > 0 ? `${h}:${m.toString().padStart(2, '0')}` : `${m}:${(seconds % 60).toString().padStart(2, '0')}`;
-    };
+    /* ----- Render ----- */
 
     return (
-        <div className="h-full flex flex-col bg-[#0f172a] text-white overflow-hidden relative font-display">
+        <div className="h-full w-full flex flex-col relative overflow-hidden font-display"
+             style={{ background: 'var(--color-bg)', color: 'var(--color-fg)' }}>
 
             {/* Header */}
-            <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <button onClick={onClose} className="p-1 -ml-2 text-slate-400 hover:text-white transition-colors">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-3">
-                        <div className="text-primary">
-                            {isRun ? <Zap className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
-                        </div>
-                        <div>
-                            <h1 className="text-sm font-bold tracking-tight uppercase text-white/90">{activity.name}</h1>
-                            <p className="text-[10px] text-white/50 font-mono uppercase">
-                                {dateStr} • {distanceKm} KM
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            <div className="flex items-center justify-between px-4 pt-6">
+                <button
+                    onClick={onClose}
+                    className="flex items-center justify-center"
+                    style={{
+                        width: 36, height: 36, borderRadius: 18,
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-line)',
+                        color: 'var(--color-fg-muted)',
+                    }}
+                    title="Back"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
                 <div className="flex gap-2">
-                    <button className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 hover:text-primary transition-colors text-slate-400">
-                        <Share className="w-4 h-4" />
-                    </button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 hover:text-primary transition-colors text-slate-400">
-                        <MoreVertical className="w-4 h-4" />
+                    <button
+                        className="flex items-center justify-center"
+                        style={{
+                            width: 36, height: 36, borderRadius: 18,
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-line)',
+                            color: 'var(--color-fg-muted)',
+                        }}
+                        title="Share"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2v10M12 2l-4 4M12 2l4 4M4 14v6h16v-6"/>
+                        </svg>
                     </button>
                 </div>
-            </header>
+            </div>
 
-            <main className="flex-1 overflow-y-auto hide-scrollbar pb-24 bg-[#0f172a]">
+            {/* Scroll body */}
+            <div className="flex-1 overflow-y-auto hide-scrollbar pb-10">
+                {/* Eyebrow + title */}
+                <div className="px-5 pt-3">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.15em]"
+                         style={{ color: 'var(--color-ignite)' }}>
+                        {eyebrowLabel} · {dateStr}
+                    </div>
+                    <div className="text-[22px] font-semibold tracking-[-0.02em] mt-1">{activity.name}</div>
+                </div>
 
-                {/* Hero */}
-                <div className="relative h-48 w-full bg-slate-900 border-b border-white/5">
-                    {hasMap ? (
-                        <div className="absolute inset-0 opacity-80 mix-blend-luminosity hover:mix-blend-normal transition-all duration-700">
-                            <HeroMap mapPolyline={details?.map?.summary_polyline || details?.map?.polyline} />
-                        </div>
+                {/* Map hero */}
+                <div className="mx-5 mt-4 relative overflow-hidden"
+                     style={{
+                         height: 170,
+                         borderRadius: 16,
+                         border: '1px solid var(--color-line)',
+                         background: 'radial-gradient(circle at 40% 30%, oklch(0.26 0.02 250) 0%, oklch(0.17 0.015 250) 70%)',
+                     }}>
+                    {hasPolyline && positions ? (
+                        <MapContainer
+                            center={positions[Math.floor(positions.length / 2)]}
+                            zoom={13}
+                            style={{ height: '100%', width: '100%', background: 'transparent' }}
+                            zoomControl={false}
+                            dragging={false}
+                            scrollWheelZoom={false}
+                            attributionControl={false}
+                        >
+                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"/>
+                            <Polyline positions={positions} color="oklch(0.72 0.17 48)" weight={3} opacity={0.95}/>
+                            <Polyline positions={positions} color="oklch(0.72 0.17 48)" weight={7} opacity={0.18}/>
+                            <Recenter positions={positions}/>
+                        </MapContainer>
                     ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#1a2035] to-slate-900 flex flex-col items-center justify-center">
-                            <Activity className="w-16 h-16 text-white/10" />
-                            <p className="text-xs font-bold uppercase tracking-widest text-white/20 mt-4">{activity.type} Details</p>
-                        </div>
+                        <svg width="100%" height="100%" viewBox="0 0 350 170" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+                            {[...Array(10)].map((_, i) => <line key={'h' + i} x1="0" y1={i * 20} x2="350" y2={i * 20} stroke="var(--color-line)"/>)}
+                            {[...Array(18)].map((_, i) => <line key={'v' + i} x1={i * 20} y1="0" x2={i * 20} y2="170" stroke="var(--color-line)"/>)}
+                            <path d="M30 130 Q 80 70 130 90 T 240 50 T 310 110 T 340 70" stroke="var(--color-ignite)" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                            <path d="M30 130 Q 80 70 130 90 T 240 50 T 310 110 T 340 70" stroke="var(--color-ignite)" strokeWidth="6" fill="none" strokeLinecap="round" opacity="0.18"/>
+                            <circle cx="30" cy="130" r="5" fill="var(--color-mint)" stroke="var(--color-bg)" strokeWidth="2"/>
+                            <circle cx="340" cy="70" r="5" fill="var(--color-ignite)" stroke="var(--color-bg)" strokeWidth="2"/>
+                        </svg>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent pointer-events-none"></div>
-                </div>
-
-                {/* Stats Grid - "The Frosted Card" */}
-                {/* NOTE: Negative margin pulls it up over the Hero as requested */}
-                <div className="px-4 -mt-12 relative z-10">
-                    <div className="glass-card rounded-xl p-5 grid grid-cols-4 gap-y-6 gap-x-2 border border-white/10 shadow-2xl bg-[#0f172a]/80 backdrop-blur-xl">
-
-                        {/* Row 1 */}
-                        {/* Prefer detail values which are raw seconds usually, mapped to formatted strings */}
-                        <ActivityStat label="Time" value={formatDuration(details?.moving_time)} unit="" />
-                        <ActivityStat label="Suffer" value={details?.suffer_score || '-'} unit="" />
-
-                        {isRun ? (
-                            <>
-                                <ActivityStat label="Elev." value={details?.total_elevation_gain || 0} unit="M" />
-                                <ActivityStat label="Cadence" value={details?.average_cadence ? Math.round(details.average_cadence * 2) : '--'} unit="" />
-                                {/* Strava sends cadence as steps/min for running usually on 'Run' type? Wait, avg_cadence is usually steps/min * 2 or just steps/min. Strava API 'average_cadence' for run is usually one-foot? No usually full. Let's assume raw is ok, unless user sees half values. */}
-                            </>
-                        ) : (
-                            <>
-                                <ActivityStat label="Avg HR" value={Math.round(details?.average_heartrate) || '--'} unit="BPM" />
-                                <ActivityStat label="Cal." value={details?.calories || '--'} unit="" />
-                            </>
-                        )}
-
-                        {/* Row 2 (Run Only mostly) */}
-                        {isRun && (
-                            <>
-                                <ActivityStat label="Max HR" value={Math.round(details?.max_heartrate) || '--'} unit="" />
-                                <ActivityStat label="Cal." value={details?.calories || '--'} unit="" />
-                                <ActivityStat label="Grade" value="0.0" unit="%" />
-                                <ActivityStat label="Temp." value="-" unit="°C" />
-                            </>
-                        )}
-                        {/* Fillers for non-run layout logic if needed, but 4 columns wraps automatically */}
+                    <div className="absolute bottom-[10px] left-3 mono-data text-[9px] uppercase pointer-events-none"
+                         style={{ color: 'var(--color-fg-dim)', letterSpacing: '0.05em' }}>
+                        Route · {distanceKm} km
                     </div>
                 </div>
 
-                {/* Sub Navigation */}
-                <div className="px-4 mt-8">
-                    <div className="flex border-b border-white/10 gap-6">
-                        {['analysis', 'splits', 'segments'].map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`pb-3 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Tab Content */}
-                <div className="px-4 py-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-
-                    {activeTab === 'analysis' && (
-                        <>
-                            {/* Performance Telemetry */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h3 className="text-xs font-bold text-white/90 uppercase tracking-tight">Performance Telemetry</h3>
-                                        {isRun && (
-                                            <div className="flex gap-3 mt-1.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                                                    <span className="text-[10px] text-white/50 font-mono uppercase tracking-tight">Pace</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-                                                    <span className="text-[10px] text-white/50 font-mono uppercase tracking-tight">HR {Math.round(details?.average_heartrate || 0)} BPM</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button className="text-white/20 hover:text-white transition-colors">
-                                        <MoreVertical className="w-5 h-5" />
-                                    </button>
-                                </div>
-
-                                {cleanChartData && cleanChartData.length > 0 ? (
-                                    <div className="h-48 w-full relative">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={cleanChartData}>
-                                                <defs>
-                                                    <linearGradient id="hrFill" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
-                                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <YAxis yAxisId="left" hide domain={['dataMin', 'dataMax']} reversed /> {/* Pace */}
-                                                <YAxis yAxisId="right" hide domain={['dataMin', 'dataMax']} /> {/* HR */}
-
-                                                {/* Dashed Grid Lines (Manual via Reference Lines or just styled Container) */}
-                                                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-
-                                                <Area yAxisId="right" type="monotone" dataKey="hr" stroke="#f43f5e" strokeWidth={2} fill="url(#hrFill)" />
-                                                <Line yAxisId="left" type="monotone" dataKey="pace" stroke="#f97415" strokeWidth={2} dot={false} />
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
-
-                                        {/* Axis Labels Bottom */}
-                                        <div className="flex justify-between mt-2 px-1">
-                                            <span className="text-[9px] text-white/30 font-mono">0.0 KM</span>
-                                            <span className="text-[9px] text-white/30 font-mono">{(distanceKm / 2).toFixed(1)} KM</span>
-                                            <span className="text-[9px] text-white/30 font-mono">{distanceKm} KM</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-32 flex items-center justify-center border border-dashed border-white/10 rounded-xl text-xs text-white/30">
-                                        No telemetry data available
-                                    </div>
-                                )}
+                {/* 6 stat grid */}
+                <div className="mx-5 mt-4 grid grid-cols-2 gap-2">
+                    {[
+                        { l: 'Distance',  v: distanceKm,  u: 'km' },
+                        { l: 'Moving',    v: movingStr,   u: '' },
+                        { l: 'Avg pace',  v: avgPace,     u: avgPace !== '—' ? '/km' : '' },
+                        { l: 'Avg HR',    v: avgHr ? Math.round(avgHr) : '—', u: avgHr ? 'bpm' : '' },
+                        { l: 'Elevation', v: elevation,   u: elevation !== '—' ? 'm' : '' },
+                        { l: 'Calories',  v: calories,    u: calories !== '—' ? 'kcal' : '' },
+                    ].map(s => (
+                        <div key={s.l}
+                             style={{
+                                 padding: '12px 14px',
+                                 background: 'var(--color-surface)',
+                                 borderRadius: 12,
+                                 border: '1px solid var(--color-line)',
+                             }}>
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em]"
+                                 style={{ color: 'var(--color-fg-dim)' }}>{s.l}</div>
+                            <div className="mono-data text-[18px] font-medium mt-[3px] tracking-[-0.03em]">
+                                {s.v}
+                                {s.u && <span className="text-[10px] ml-1" style={{ color: 'var(--color-fg-dim)' }}>{s.u}</span>}
                             </div>
+                        </div>
+                    ))}
+                </div>
 
-                            {/* Heart Rate Zones */}
-                            {hrDistribution.some(z => z.value > 0) && (
-                                <div className="pt-2">
-                                    <h3 className="text-xs font-bold text-white/90 uppercase tracking-widest mb-4">Heart Rate Zones</h3>
-                                    <div className="space-y-4">
-                                        {hrDistribution.map((zone) => (
-                                            <div key={zone.name} className="flex items-center gap-3 group">
-                                                <span className="w-8 text-[10px] font-mono text-white/40 group-hover:text-white transition-colors">{zone.name}</span>
-                                                <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden flex">
-                                                    <div
-                                                        className="h-full rounded-full transition-all duration-1000 ease-out"
-                                                        style={{ width: `${zone.value}%`, backgroundColor: zone.color }}
-                                                    ></div>
-                                                </div>
-                                                <span className="w-12 text-[10px] font-mono text-right text-white/60 group-hover:text-white transition-colors">{zone.label}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                {/* HR card */}
+                <div className="mx-5 mt-4 p-[14px]"
+                     style={{
+                         background: 'var(--color-surface)',
+                         borderRadius: 12,
+                         border: '1px solid var(--color-line)',
+                     }}>
+                    <div className="flex justify-between items-center">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                             style={{ color: 'var(--color-fg-dim)' }}>
+                            Heart rate
+                        </div>
+                        {maxHr && (
+                            <div className="mono-data text-[11px]" style={{ color: 'var(--color-crimson)' }}>
+                                max {Math.round(maxHr)}
+                            </div>
+                        )}
+                    </div>
+                    <HRTrace data={hrTrace}/>
+                </div>
 
-                            {/* AI Coach Analysis */}
-                            {aiSummary ? (
-                                <div className="space-y-4 pt-4">
-                                    {/* Run Type & Effort Badge */}
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {aiSummary.runType && (
-                                            <span className="px-3 py-1 bg-indigo-500/20 rounded-full text-[11px] font-bold text-indigo-300 uppercase">
-                                                {aiSummary.runType}
-                                            </span>
-                                        )}
-                                        {aiSummary.relativeEffort && (
-                                            <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase ${aiSummary.relativeEffort.toLowerCase() === 'low'
-                                                ? 'bg-emerald-500/20 text-emerald-400'
-                                                : aiSummary.relativeEffort.toLowerCase() === 'moderate'
-                                                    ? 'bg-yellow-500/20 text-yellow-400'
-                                                    : 'bg-red-500/20 text-red-400'
-                                                }`}>
-                                                {aiSummary.relativeEffort} Effort
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* About This Workout - Shows highlight */}
-                                    <div className="glass-card p-4 rounded-xl border border-indigo-500/20 bg-gradient-to-br from-indigo-900/30 to-slate-900/30">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                                                <Sparkles className="w-3 h-3 text-indigo-400" />
-                                            </div>
-                                            <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest">About This Workout</h3>
-                                        </div>
-                                        <p className="text-sm text-white/80 leading-relaxed">
-                                            {aiSummary.highlight || aiSummary.summary || 'AI analysis available.'}
-                                        </p>
-                                    </div>
-
-                                    {/* Way Forward - Shows suggestion */}
-                                    {aiSummary.suggestion && (
-                                        <div className="glass-card p-4 rounded-xl border border-primary/20 bg-gradient-to-br from-orange-900/20 to-slate-900/30">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                                                    <TrendingUp className="w-3 h-3 text-primary" />
-                                                </div>
-                                                <h3 className="text-xs font-bold text-primary uppercase tracking-widest">Way Forward</h3>
-                                            </div>
-                                            <p className="text-sm text-white/80 leading-relaxed italic">
-                                                "{aiSummary.suggestion}"
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="pt-4">
-                                    <button
-                                        onClick={async () => {
-                                            if (!details) {
-                                                console.error('Activity details not loaded yet');
-                                                return;
-                                            }
-                                            setAiLoading(true);
-                                            try {
-                                                const token = localStorage.getItem('authToken');
-                                                const res = await fetch(`${API_BASE_URL}/api/activities/${activity.id}/analysis`, {
-                                                    method: 'POST',
-                                                    headers: {
-                                                        'Content-Type': 'application/json',
-                                                        'Authorization': `Bearer ${token}`
-                                                    },
-                                                    credentials: 'include',
-                                                    body: JSON.stringify({ activityData: details })
-                                                });
-                                                if (res.ok) {
-                                                    const data = await res.json();
-                                                    if (data.versions?.length > 0) {
-                                                        const latest = data.versions[data.versions.length - 1];
-                                                        try {
-                                                            setAiSummary(JSON.parse(latest.text));
-                                                        } catch {
-                                                            setAiSummary({ summary: latest.text });
-                                                        }
-                                                    }
-                                                }
-                                            } catch (err) {
-                                                console.error('Failed to generate AI analysis:', err);
-                                            } finally {
-                                                setAiLoading(false);
-                                            }
-                                        }}
-                                        disabled={aiLoading}
-                                        className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
-                                    >
-                                        {aiLoading ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Generating Analysis...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Sparkles className="w-4 h-4" />
-                                                Generate AI Analysis
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {activeTab === 'splits' && (
-                        <div className="text-center py-10">
-                            <Timer className="w-8 h-8 text-white/20 mx-auto mb-3" />
-                            <p className="text-xs text-white/40">Lap splits data coming soon.</p>
+                {/* Coach insight */}
+                <div className="mx-5 mt-3 p-[14px]"
+                     style={{
+                         borderRadius: 12,
+                         background: 'color-mix(in oklch, var(--color-ignite) 12%, transparent)',
+                         border: '1px solid color-mix(in oklch, var(--color-ignite) 25%, transparent)',
+                     }}>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em]"
+                         style={{ color: 'var(--color-ignite)' }}>
+                        Coach insight
+                    </div>
+                    <div className="mt-[6px] text-[13px] leading-[1.45]" style={{ color: 'var(--color-fg)' }}>
+                        {aiSummary ? coachHeadline : (loading ? 'Analyzing this session…' : coachHeadline)}
+                    </div>
+                    {aiSummary?.suggestion && (
+                        <div className="mt-[8px] text-[12px] italic leading-[1.45]"
+                             style={{ color: 'var(--color-fg-muted)' }}>
+                            "{aiSummary.suggestion}"
                         </div>
                     )}
-
-                    {activeTab === 'segments' && (
-                        <div className="text-center py-10">
-                            <Mountain className="w-8 h-8 text-white/20 mx-auto mb-3" />
-                            <p className="text-xs text-white/40">Segment analysis coming soon.</p>
-                        </div>
-                    )}
-
+                    <div className="flex gap-[8px] mt-[10px]">
+                        <button
+                            onClick={onAskCoach}
+                            className="font-display font-semibold text-[12px]"
+                            style={{
+                                height: 32, padding: '0 12px', borderRadius: 8,
+                                background: 'var(--color-ignite)',
+                                color: '#fff', border: 'none',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Ask coach →
+                        </button>
+                        {!aiSummary && !loading && (
+                            <button
+                                onClick={generateAnalysis}
+                                disabled={aiLoading || !details}
+                                className="font-display font-medium text-[12px] disabled:opacity-50"
+                                style={{
+                                    height: 32, padding: '0 12px', borderRadius: 8,
+                                    background: 'transparent',
+                                    border: '1px solid var(--color-line)',
+                                    color: 'var(--color-fg-muted)',
+                                }}
+                            >
+                                {aiLoading ? 'Analysing…' : 'Generate analysis'}
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </main>
-
-            {/* Bottom Floating Action Bar (Optional, mimicking HTML Footer if needed, else empty) */}
-            <footer className="absolute bottom-6 left-4 right-4 z-50">
-                {/*  Replicating HTML Footer Actions */}
-                <div className="flex gap-3">
-                    <button className="flex-1 h-12 rounded-xl bg-primary text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-orange-600 transition-colors active:scale-95">
-                        <TrendingUp className="w-4 h-4" />
-                        Lap Splits
-                    </button>
-                    <button className="w-12 h-12 rounded-xl glass-card hover:bg-white/10 transition-colors flex items-center justify-center text-white/80 active:scale-95">
-                        <Activity className="w-5 h-5" />
-                    </button>
-                </div>
-            </footer>
-
+            </div>
         </div>
     );
 };

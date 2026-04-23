@@ -1,19 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, Target, Calendar, TrendingUp, SkipForward, ArrowLeftRight, Gauge, Clock, MessageCircle, BarChart3, CalendarPlus } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 
 const ACTION_BADGES = {
-    create_goal: { label: 'Goal Created', icon: Target, color: 'text-emerald-400 border-emerald-500/30' },
-    update_goal: { label: 'Goal Updated', icon: Target, color: 'text-blue-400 border-blue-500/30' },
-    delete_goal: { label: 'Goal Removed', icon: Target, color: 'text-red-400 border-red-500/30' },
-    skip_workout: { label: 'Workout Skipped', icon: SkipForward, color: 'text-amber-400 border-amber-500/30' },
-    swap_workouts: { label: 'Workouts Swapped', icon: ArrowLeftRight, color: 'text-purple-400 border-purple-500/30' },
-    adjust_difficulty: { label: 'Intensity Adjusted', icon: Gauge, color: 'text-orange-400 border-orange-500/30' },
-    adjust_intensity: { label: 'Intensity Adjusted', icon: Gauge, color: 'text-orange-400 border-orange-500/30' },
-    modify_plan: { label: 'Plan Updated', icon: Sparkles, color: 'text-primary border-primary/30' },
-    get_estimate: { label: 'Estimate', icon: Clock, color: 'text-cyan-400 border-cyan-500/30' },
-    weekly_summary: { label: 'Weekly Summary', icon: BarChart3, color: 'text-indigo-400 border-indigo-500/30' },
-    extend_goal: { label: 'Goal Extended', icon: CalendarPlus, color: 'text-teal-400 border-teal-500/30' },
+    create_goal: { label: 'Goal Created', color: { text: 'var(--color-mint)', border: 'color-mix(in oklch, var(--color-mint) 30%, transparent)' } },
+    update_goal: { label: 'Goal Updated', color: { text: 'var(--color-sky)', border: 'color-mix(in oklch, var(--color-sky) 30%, transparent)' } },
+    delete_goal: { label: 'Goal Removed', color: { text: 'var(--color-crimson)', border: 'color-mix(in oklch, var(--color-crimson) 30%, transparent)' } },
+    skip_workout: { label: 'Workout Skipped', color: { text: 'var(--color-ignite)', border: 'color-mix(in oklch, var(--color-ignite) 30%, transparent)' } },
+    swap_workouts: { label: 'Workouts Swapped', color: { text: 'var(--color-gold)', border: 'color-mix(in oklch, var(--color-gold) 30%, transparent)' } },
+    adjust_difficulty: { label: 'Intensity Adjusted', color: { text: 'var(--color-ignite)', border: 'color-mix(in oklch, var(--color-ignite) 30%, transparent)' } },
+    adjust_intensity: { label: 'Intensity Adjusted', color: { text: 'var(--color-ignite)', border: 'color-mix(in oklch, var(--color-ignite) 30%, transparent)' } },
+    modify_plan: { label: 'Plan Updated', color: { text: 'var(--color-ignite)', border: 'color-mix(in oklch, var(--color-ignite) 30%, transparent)' } },
+    get_estimate: { label: 'Estimate', color: { text: 'var(--color-sky)', border: 'color-mix(in oklch, var(--color-sky) 30%, transparent)' } },
+    weekly_summary: { label: 'Weekly Summary', color: { text: 'var(--color-sky)', border: 'color-mix(in oklch, var(--color-sky) 30%, transparent)' } },
+    extend_goal: { label: 'Goal Extended', color: { text: 'var(--color-mint)', border: 'color-mix(in oklch, var(--color-mint) 30%, transparent)' } },
 };
 
 const QUICK_SUGGESTIONS = [
@@ -25,6 +24,14 @@ const QUICK_SUGGESTIONS = [
     { label: 'Push goal back', message: "Push my goal back by 2 weeks" },
 ];
 
+// Brain SVG used in avatars
+const BrainSVG = ({ size = 14, color = 'white' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
+        <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
+        <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
+    </svg>
+);
+
 const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
     const [messages, setMessages] = useState([
         { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!" }
@@ -33,6 +40,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(true);
     const [historyLoaded, setHistoryLoaded] = useState(false);
+    const [inputFocused, setInputFocused] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -135,9 +143,16 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         if (!msg.action || msg.action === 'chat') {
             if (msg.planUpdate) {
                 return (
-                    <div className="mt-3 pt-2 border-t border-white/10 text-xs text-primary flex items-center gap-1.5 font-bold uppercase tracking-wide">
-                        <Sparkles className="w-3 h-3" />
-                        Plan updated
+                    <div style={{
+                        background: 'color-mix(in oklch, var(--color-ignite) 10%, transparent)',
+                        border: '1px solid color-mix(in oklch, var(--color-ignite) 20%, transparent)',
+                        borderRadius: 12,
+                        padding: '10px 12px',
+                        marginTop: 10
+                    }}>
+                        <div className="mono-data" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--color-ignite)', textTransform: 'uppercase' }}>Plan Updated</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-fg-muted)', marginTop: 4 }}>Your session has been adjusted.</div>
+                        <button style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ignite)', background: 'none', border: 'none', padding: 0, marginTop: 8, cursor: 'pointer' }}>View session →</button>
                     </div>
                 );
             }
@@ -147,71 +162,219 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         const badge = ACTION_BADGES[msg.action];
         if (!badge) return null;
 
-        const Icon = badge.icon;
         return (
-            <div className={`mt-3 pt-2 border-t border-white/10 text-xs flex items-center gap-1.5 font-bold uppercase tracking-wide ${badge.color}`}>
-                <Icon className="w-3 h-3" />
+            <div style={{
+                marginTop: 10,
+                paddingTop: 8,
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: badge.color.text,
+            }}>
                 {badge.label}
             </div>
         );
     };
 
+    if (!isOpen) return null;
+
     return (
-        <div
-            className={`fixed bottom-0 left-0 right-0 mx-auto w-full max-w-[450px] h-[85vh] bg-[#0f172a]/90 backdrop-blur-md rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col z-50 transition-transform duration-500 cubic-bezier(0.32, 0.72, 0, 1) ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}
-        >
-            {/* Grab Handle / Close Area */}
-            <div className="flex flex-col items-center pt-4 pb-2 cursor-pointer active:opacity-70" onClick={onClose}>
-                <div className="w-12 h-1.5 bg-slate-700/50 rounded-full"></div>
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--color-bg)',
+            zIndex: 50,
+            display: 'flex',
+            flexDirection: 'column',
+        }}>
+            {/* Header */}
+            <div style={{
+                height: 60,
+                background: 'var(--color-surface)',
+                borderBottom: '1px solid var(--color-line)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 16px',
+                gap: 12,
+                flexShrink: 0,
+            }}>
+                {/* Back button */}
+                <button
+                    onClick={onClose}
+                    style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-line)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: 'var(--color-fg)',
+                        flexShrink: 0,
+                    }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M19 12H5M12 5l-7 7 7 7" />
+                    </svg>
+                </button>
+
+                {/* Coach avatar */}
+                <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--color-ignite), var(--color-crimson))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                }}>
+                    <BrainSVG size={14} color="white" />
+                </div>
+
+                {/* Title area */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="font-display" style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-fg)' }}>
+                        Coach
+                    </span>
+                    <span className="mono-data" style={{ fontSize: 10, color: 'var(--color-mint)', marginLeft: 8 }}>
+                        ● LIVE
+                    </span>
+                </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Message thread */}
+            <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+            }}>
                 {messages.map((msg, idx) => (
                     <div
                         key={idx}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        style={{
+                            display: 'flex',
+                            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        }}
                     >
                         {msg.role === 'assistant' && (
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 mr-2 mt-2 flex-shrink-0">
-                                <span className="material-symbols-outlined text-primary text-[14px]">psychology</span>
+                            <div style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                background: 'color-mix(in oklch, var(--color-ignite) 15%, transparent)',
+                                border: '1px solid color-mix(in oklch, var(--color-ignite) 25%, transparent)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 8,
+                                marginTop: 4,
+                                flexShrink: 0,
+                            }}>
+                                <BrainSVG size={12} color="var(--color-ignite)" />
                             </div>
                         )}
-                        <div
-                            className={`max-w-[80%] px-5 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-primary text-white rounded-br-sm shadow-md shadow-orange-900/20 font-medium'
-                                : 'bg-[#1e293b] text-slate-200 rounded-bl-sm border border-white/5'
-                                }`}
-                        >
+                        <div style={{
+                            maxWidth: '80%',
+                            padding: '12px 16px',
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            ...(msg.role === 'user'
+                                ? {
+                                    background: 'var(--color-ignite)',
+                                    color: 'white',
+                                    borderRadius: '18px 18px 4px 18px',
+                                    fontWeight: 500,
+                                }
+                                : {
+                                    background: 'var(--color-surface)',
+                                    border: '1px solid var(--color-line)',
+                                    borderRadius: '18px 18px 18px 4px',
+                                    color: 'var(--color-fg)',
+                                }
+                            ),
+                        }}>
                             {msg.content}
                             {msg.role === 'assistant' && renderActionBadge(msg)}
                         </div>
                     </div>
                 ))}
+
+                {/* Loading indicator */}
                 {isLoading && (
-                    <div className="flex justify-start">
-                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 mr-2 flex-shrink-0">
-                            <span className="material-symbols-outlined text-primary text-[14px]">psychology</span>
+                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                        <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: 'color-mix(in oklch, var(--color-ignite) 15%, transparent)',
+                            border: '1px solid color-mix(in oklch, var(--color-ignite) 25%, transparent)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 8,
+                            marginTop: 4,
+                            flexShrink: 0,
+                        }}>
+                            <BrainSVG size={12} color="var(--color-ignite)" />
                         </div>
-                        <div className="bg-[#1e293b] px-4 py-3 rounded-2xl rounded-bl-sm border border-white/5 flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                            <span className="text-xs text-slate-400 font-medium">Thinking...</span>
+                        <div style={{
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-line)',
+                            borderRadius: '18px 18px 18px 4px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                        }}>
+                            {[0, 150, 300].map((delay, i) => (
+                                <div
+                                    key={i}
+                                    className="animate-bounce"
+                                    style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: '50%',
+                                        background: 'var(--color-fg-dim)',
+                                        animationDelay: `${delay}ms`,
+                                    }}
+                                />
+                            ))}
                         </div>
                     </div>
                 )}
+
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Quick Suggestions */}
+            {/* Quick suggestion pills */}
             {showSuggestions && messages.length <= 2 && (
-                <div className="px-4 pb-2">
-                    <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+                <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
+                    <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                         {QUICK_SUGGESTIONS.map((suggestion, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => handleSuggestionClick(suggestion)}
                                 disabled={isLoading}
-                                className="flex-none px-3 py-1.5 text-xs font-medium rounded-full bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white hover:border-primary/30 transition-all whitespace-nowrap disabled:opacity-50"
+                                style={{
+                                    background: 'var(--color-surface-2)',
+                                    border: '1px solid var(--color-line)',
+                                    borderRadius: 20,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    color: 'var(--color-fg-muted)',
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                    opacity: isLoading ? 0.5 : 1,
+                                }}
                             >
                                 {suggestion.label}
                             </button>
@@ -220,24 +383,64 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                 </div>
             )}
 
-            {/* Input */}
-            <div className="p-4 pb-8 bg-gradient-to-t from-[#0f172a] to-[#0f172a]/95 border-t border-white/5">
-                <div className="flex items-center gap-2 bg-slate-900/80 rounded-2xl px-2 py-2 border border-white/5 focus-within:border-primary/50 transition-colors">
+            {/* Input bar */}
+            <div style={{
+                background: 'var(--color-surface)',
+                borderTop: '1px solid var(--color-line)',
+                padding: '12px 16px 24px',
+                flexShrink: 0,
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--color-surface-2)',
+                    border: `1px solid ${inputFocused ? 'var(--color-ignite)' : 'var(--color-line)'}`,
+                    borderRadius: 28,
+                    padding: '8px',
+                    gap: 8,
+                    transition: 'border-color 0.15s',
+                }}>
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="Ask your coach anything..."
-                        className="flex-1 bg-transparent text-white text-sm placeholder-slate-500 focus:outline-none px-3 font-medium"
+                        onFocus={() => setInputFocused(true)}
+                        onBlur={() => setInputFocused(false)}
+                        placeholder="Ask coach…"
                         disabled={isLoading}
+                        style={{
+                            flex: 1,
+                            background: 'transparent',
+                            color: 'var(--color-fg)',
+                            border: 'none',
+                            outline: 'none',
+                            padding: '0 12px',
+                            fontSize: 14,
+                        }}
                     />
                     <button
                         onClick={() => sendMessage()}
                         disabled={!input.trim() || isLoading}
-                        className="p-3 bg-primary rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-orange-900/20"
+                        style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            background: input.trim() ? 'var(--color-ignite)' : 'var(--color-surface)',
+                            border: '1px solid var(--color-line)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                            color: input.trim() ? 'white' : 'var(--color-fg-dim)',
+                            transition: 'background 0.15s, color 0.15s',
+                            flexShrink: 0,
+                            opacity: isLoading ? 0.5 : 1,
+                        }}
                     >
-                        <Send className="w-4 h-4 text-white" />
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                        </svg>
                     </button>
                 </div>
             </div>
