@@ -650,9 +650,54 @@ const App = () => {
                     <AlternateWorkoutModal
                         workout={selectedAlternate}
                         onClose={() => setSelectedAlternate(null)}
-                        onSwap={() => {
-                            setSelectedAlternate(null);
-                            go('#/coach');
+                        onSwap={async () => {
+                            try {
+                                const token = localStorage.getItem('authToken');
+                                if (!token) {
+                                    console.error('No auth token found');
+                                    return;
+                                }
+
+                                const workoutTitle = selectedAlternate.title || selectedAlternate.type || 'alternate workout';
+
+                                // Call the dedicated swap-workout endpoint
+                                const response = await fetch(`${API_BASE_URL}/api/coach/swap-workout`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                        alternateTitle: workoutTitle
+                                    })
+                                });
+
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    console.log('Swap successful:', data);
+
+                                    // Close modal and refresh plans
+                                    setSelectedAlternate(null);
+
+                                    // Refresh the plan version to trigger re-render
+                                    setPlanVersion(v => v + 1);
+
+                                    // Fetch updated user data
+                                    const userRes = await fetch(`${API_BASE_URL}/api/user`, {
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    if (userRes.ok) {
+                                        setUser(await userRes.json());
+                                    }
+                                } else {
+                                    const error = await response.json();
+                                    console.error('Swap failed:', error);
+                                    alert('Failed to swap workout. Please try again.');
+                                }
+                            } catch (error) {
+                                console.error('Swap error:', error);
+                                alert('Error swapping workout. Please try again.');
+                            }
                         }}
                     />
                 </div>

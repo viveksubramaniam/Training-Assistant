@@ -172,7 +172,7 @@ const AlternateWorkoutModal = ({ workout, onClose, onSwap }) => {
                         {/* Primary action */}
                         <button
                             onClick={onSwap}
-                            className="relative mt-6 w-full h-[54px] flex items-center justify-center gap-2 font-display text-[16px] font-semibold active:scale-[0.985] transition"
+                            className="relative mt-6 w-full h-[54px] flex items-center justify-center gap-2 font-display text-[16px] font-semibold active:scale-[0.985] transition disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
                                 borderRadius: 14,
                                 background: 'var(--color-ignite)',
