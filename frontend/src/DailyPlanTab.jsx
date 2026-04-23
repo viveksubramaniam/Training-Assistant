@@ -57,7 +57,7 @@ const STEP_COLORS = [
    Component
    -------------------------------------------------------------- */
 
-const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach }) => {
+const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach, onSelectAlternate }) => {
     const [loading, setLoading] = useState(true);
     const [recommended, setRecommended] = useState(null);
     const [alternates, setAlternates] = useState([]);
@@ -369,18 +369,6 @@ const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach
 
                     <div className="relative mt-[10px] flex gap-[10px]">
                         <button
-                            onClick={onOpenCoach}
-                            className="flex-1 h-[42px] text-[13px] font-medium font-display transition"
-                            style={{
-                                borderRadius: 12,
-                                background: 'transparent',
-                                border: '1px solid var(--color-line)',
-                                color: 'var(--color-fg-muted)',
-                            }}
-                        >
-                            Swap workout
-                        </button>
-                        <button
                             className="flex-1 h-[42px] text-[13px] font-medium font-display transition"
                             style={{
                                 borderRadius: 12,
@@ -406,8 +394,8 @@ const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach
                         {alternates.map((a, i) => (
                             <button
                                 key={i}
-                                onClick={onOpenCoach}
-                                className="shrink-0 text-left px-3 py-[10px] min-w-[180px]"
+                                onClick={() => onSelectAlternate && onSelectAlternate(a)}
+                                className="shrink-0 text-left px-3 py-[10px] min-w-[180px] transition hover:border-[var(--color-ignite)]"
                                 style={{
                                     background: 'var(--color-surface)',
                                     border: '1px solid var(--color-line)',
@@ -451,16 +439,18 @@ const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach
                             No upcoming sessions this week
                         </div>
                     ) : upcoming.map((day, i) => (
-                        <div key={i}
-                             className="shrink-0 snap-center"
-                             style={{
-                                 width: 148,
-                                 padding: 12,
-                                 borderRadius: 14,
-                                 background: 'var(--color-surface)',
-                                 border: '1px solid var(--color-line)',
-                                 borderLeft: `3px solid var(--color-ignite)`,
-                             }}>
+                        <button
+                            key={i}
+                            onClick={onNavigateToCalendar}
+                            className="shrink-0 snap-center text-left transition hover:border-[var(--color-ignite)] active:scale-[0.98]"
+                            style={{
+                                width: 148,
+                                padding: 12,
+                                borderRadius: 14,
+                                background: 'var(--color-surface)',
+                                border: '1px solid var(--color-line)',
+                                borderLeft: `3px solid var(--color-ignite)`,
+                            }}>
                             <div className="text-[10px] font-semibold uppercase tracking-[0.12em]"
                                  style={{ color: 'var(--color-ignite)' }}>
                                 {day.dayName || day.day_name || ''}
@@ -475,7 +465,7 @@ const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach
                                  }}>
                                 {day.distance ? `${day.distance} km` : 'Recovery'}
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             </div>
