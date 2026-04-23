@@ -203,6 +203,20 @@ const triggerOrchestration = async (userId) => {
         const fitnessProfile = await db.getFitnessProfile(userId);
         console.log(`[Async] Fitness profile: avgPace=${fitnessProfile.avgPaceMinKm}, weeklyKm=${fitnessProfile.avgWeeklyDistanceKm}, PBs=${fitnessProfile.personalBests.length}`);
 
+        // --- Issue #9: Compute personalized paces from activity history ---
+        // Estimate how many weeks into the plan the user is (for 2 %/week progression)
+        const weeksCompleted = masterPlan
+            ? Math.floor((Date.now() - new Date(goal.created_at).getTime()) / (7 * 24 * 60 * 60 * 1000))
+            : 0;
+        const personalizedPaces = await db.computePersonalizedPaces(userId, weeksCompleted);
+        console.log(`[Async] Personalized paces (week ${weeksCompleted}): easy=${personalizedPaces.easyPace}, tempo=${personalizedPaces.tempoPace}, longRun=${personalizedPaces.longRunPace}`);
+
+        // Enrich the fitness profile with pace breakdowns so the LLM can use them
+        const enrichedFitnessProfile = {
+            ...fitnessProfile,
+            personalizedPaces
+        };
+
         console.log(`[Async] Calling AI service at: ${AI_SERVICE_URL}/orchestrate`);
         console.log(`[Async] Payload userId: ${userId}, Goal: ${goal.goal_type}`);
 
@@ -216,7 +230,7 @@ const triggerOrchestration = async (userId) => {
             masterPlan: masterPlan,
             weeklyPlan: cachedWeekly,
             recentActivities: activitiesSummary,
-            fitnessProfile,
+            fitnessProfile: enrichedFitnessProfile,
             forceRegenerate: false
         }, { timeout: 120000 });
 
@@ -245,10 +259,15 @@ const triggerOrchestration = async (userId) => {
             await db.saveMasterPlan(goal.id, newMasterPlan);
         }
 
-        // Cache weekly plan if newly generated
+        // Cache weekly plan if newly generated — persist personalized paces alongside (issue #9)
         if (weeklyPlan && !cachedWeekly) {
             console.log(`[Async] Caching new weekly plan`);
-            await db.cacheWeeklyPlan(userId, weekStart, weeklyPlan);
+            await db.cacheWeeklyPlan(userId, weekStart, {
+                ...weeklyPlan,
+                weeklyEasyPace:    personalizedPaces.easyPace,
+                weeklyTempoPace:   personalizedPaces.tempoPace,
+                weeklyLongRunPace: personalizedPaces.longRunPace
+            });
         }
 
         if (dailyPlan) {
@@ -397,6 +416,18 @@ router.post('/regenerate', requireAuth, async (req, res) => {
         const fitnessProfile = await db.getFitnessProfile(userId);
         console.log(`[Regenerate] Fitness profile: avgPace=${fitnessProfile.avgPaceMinKm}, weeklyKm=${fitnessProfile.avgWeeklyDistanceKm}, PBs=${fitnessProfile.personalBests.length}`);
 
+        // --- Issue #9: Compute personalized paces from activity history ---
+        const regenWeeksCompleted = Math.floor(
+            (Date.now() - new Date(goal.created_at).getTime()) / (7 * 24 * 60 * 60 * 1000)
+        );
+        const regenPersonalizedPaces = await db.computePersonalizedPaces(userId, regenWeeksCompleted);
+        console.log(`[Regenerate] Personalized paces (week ${regenWeeksCompleted}): easy=${regenPersonalizedPaces.easyPace}, tempo=${regenPersonalizedPaces.tempoPace}, longRun=${regenPersonalizedPaces.longRunPace}`);
+
+        const enrichedFitnessProfile = {
+            ...fitnessProfile,
+            personalizedPaces: regenPersonalizedPaces
+        };
+
         console.log(`[Regenerate] Calling AI service with forceRegenerate=true...`);
         const response = await axios.post(`${AI_SERVICE_URL}/orchestrate`, {
             userId: String(userId),
@@ -409,7 +440,7 @@ router.post('/regenerate', requireAuth, async (req, res) => {
             masterPlan: null, // Force regeneration
             weeklyPlan: null, // Force regeneration
             recentActivities: activitiesSummary,
-            fitnessProfile,
+            fitnessProfile: enrichedFitnessProfile,
             forceRegenerate: true
         }, { timeout: 120000 });
 
@@ -432,11 +463,16 @@ router.post('/regenerate', requireAuth, async (req, res) => {
         const weeklyPlan = result.weeklyPlan || result.weekly_plan || responseData.weeklyPlan || responseData.weekly_plan;
         const dailyPlan = result.dailyPlan || result.daily_plan || responseData.dailyPlan || responseData.daily_plan;
 
-        // Cache the new plans
+        // Cache the new plans — persist personalized paces alongside (issue #9)
         const weekStart = getWeekStart();
         if (weeklyPlan) {
             console.log(`[Regenerate] Caching new weekly plan`);
-            await db.cacheWeeklyPlan(userId, weekStart, weeklyPlan);
+            await db.cacheWeeklyPlan(userId, weekStart, {
+                ...weeklyPlan,
+                weeklyEasyPace:    regenPersonalizedPaces.easyPace,
+                weeklyTempoPace:   regenPersonalizedPaces.tempoPace,
+                weeklyLongRunPace: regenPersonalizedPaces.longRunPace
+            });
         }
 
         if (dailyPlan) {

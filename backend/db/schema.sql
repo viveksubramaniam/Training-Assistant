@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS weekly_plan_cache (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
     week_start DATE NOT NULL,
-    
+
     -- Daily columns for easy SQL querying
     monday JSONB,
     tuesday JSONB,
@@ -313,7 +313,13 @@ CREATE TABLE IF NOT EXISTS weekly_plan_cache (
     friday JSONB,
     saturday JSONB,
     sunday JSONB,
-    
+
+    -- Personalized pace targets derived from historical activity analysis (issue #9)
+    -- Format: "mm:ss" per km, e.g. "5:45"
+    weekly_easy_pace     VARCHAR(20),  -- Easy / Zone-2 run pace
+    weekly_tempo_pace    VARCHAR(20),  -- Tempo / threshold run pace
+    weekly_long_run_pace VARCHAR(20),  -- Long run pace
+
     cached_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, week_start)
 );

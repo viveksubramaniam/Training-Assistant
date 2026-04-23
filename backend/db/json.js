@@ -379,6 +379,14 @@ export const clearUserCaches = async (userId) => {
     return true;
 };
 
+/**
+ * Compute personalized paces — stub for JSON adapter.
+ * Returns nulls so the LLM uses its own defaults when running without PostgreSQL.
+ */
+export const computePersonalizedPaces = async (_userId, _weeksCompleted = 0) => {
+    return { easyPace: null, tempoPace: null, longRunPace: null };
+};
+
 // Export database instances for backward compatibility
 export const db = activitiesDb;
 export const summaryDb = summariesDb;

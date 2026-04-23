@@ -489,6 +489,28 @@ When applying this modification:
     if fp and fp.get('totalActivitiesAnalysed', 0) > 0:
         pb_list = fp.get('personalBests', [])
         pb_str = ', '.join([f"{pb['name']}: {pb.get('formatted', 'N/A')}" for pb in pb_list[:6]]) if pb_list else 'None recorded'
+
+        # --- Issue #9: personalised paces derived from historical activity analysis ---
+        pp = fp.get('personalizedPaces') or {}
+        easy_pace    = pp.get('easyPace')    or 'N/A'
+        tempo_pace   = pp.get('tempoPace')   or 'N/A'
+        long_run_pace = pp.get('longRunPace') or 'N/A'
+
+        personalized_pace_block = ""
+        if easy_pace != 'N/A' or tempo_pace != 'N/A':
+            personalized_pace_block = f"""
+PERSONALIZED TARGET PACES (derived from athlete's own recent runs — use these, not generic estimates):
+  Easy Run pace:    {easy_pace} /km
+  Tempo Run pace:   {tempo_pace} /km
+  Long Run pace:    {long_run_pace} /km
+
+These paces already incorporate a 2 % per-week progressive improvement.
+Use them as the primary pace reference for EVERY workout in this plan.
+Only deviate if the workout type clearly demands a different effort (e.g. race-pace intervals).
+"""
+        else:
+            personalized_pace_block = "\n(No personalized pace data yet — use the athlete's avg pace to estimate.)\n"
+
         weekly_fitness_context = f"""
 ATHLETE FITNESS PROFILE:
 Avg Pace: {fp.get('avgPaceMinKm', 'N/A')}/km
@@ -496,8 +518,10 @@ Avg Weekly Distance: {fp.get('avgWeeklyDistanceKm', 'N/A')}km
 Avg Heart Rate: {fp.get('avgHeartRate', 'N/A')} bpm
 Longest Run: {fp.get('longestRunKm', 'N/A')}km
 Personal Bests: {pb_str}
-
-IMPORTANT: Use this profile to set REALISTIC paces. Easy runs should be 30-60s slower than avg pace. Tempo should be 10-20s faster than avg pace. Long runs at avg pace or slightly slower. Do NOT set paces the athlete cannot sustain.
+{personalized_pace_block}
+IMPORTANT: Use the PERSONALIZED TARGET PACES above to set REALISTIC pace targets for each day.
+Do NOT assign random or generic paces. Easy runs should be 30-60s slower than avg pace,
+tempo runs 10-20s faster, and long runs at avg pace or slightly slower.
 """
 
     prompt = f"""Create a detailed 7-day running schedule.
@@ -644,16 +668,37 @@ def daily_planner(state: PlanState) -> PlanState:
     if not today_workout:
         today_workout = {"workout_type": "Easy Run", "title": "Recovery Run", "distance": 5}
     
+    # --- Issue #9: pull personalized paces into the daily prompt ---
+    fitness_profile = state.get('fitness_profile') or {}
+    pp = fitness_profile.get('personalizedPaces') or {}
+    dp_easy_pace    = pp.get('easyPace')    or today_workout.get('target_pace', '5:45 /km')
+    dp_tempo_pace   = pp.get('tempoPace')   or today_workout.get('target_pace', '5:00 /km')
+    dp_long_pace    = pp.get('longRunPace') or today_workout.get('target_pace', '5:30 /km')
+
+    workout_type_lower = today_workout.get('workout_type', '').lower()
+    if 'tempo' in workout_type_lower or 'interval' in workout_type_lower:
+        suggested_pace = dp_tempo_pace
+    elif 'long' in workout_type_lower:
+        suggested_pace = dp_long_pace
+    else:
+        suggested_pace = dp_easy_pace
+
     prompt = f"""Create today's workout options.
 
 TODAY: {today} ({today_day_name})
 GOAL: {goal.get('type', 'General Fitness')}
 WEEKLY TARGET: {goal.get('weeklyTarget', 40)}km
 
+PERSONALIZED PACE TARGETS (derived from athlete's actual run history — use these):
+  Easy Run:  {dp_easy_pace} /km
+  Tempo Run: {dp_tempo_pace} /km
+  Long Run:  {dp_long_pace} /km
+Suggested pace for today's workout: {suggested_pace} /km
+
 SCHEDULED WORKOUT FROM WEEKLY PLAN:
 {json.dumps(today_workout, indent=2)}
 
-The RECOMMENDED option MUST match the scheduled workout above.
+The RECOMMENDED option MUST match the scheduled workout above and use the personalized pace above.
 Create 2 alternatives: one lighter, one different type.
 
 INTENSITY LABELS (use ONLY these):

@@ -242,6 +242,16 @@ export const getWeeklyPoints = adapter.getWeeklyPoints;
 export const getFitnessProfile = adapter.getFitnessProfile;
 export const calculateStreak = adapter.calculateStreak;
 
+/**
+ * Compute personalized pace targets (easy / tempo / long-run) from activity history.
+ * Only available in the PostgreSQL adapter; falls back to returning nulls in JSON mode.
+ * @param {string} userId
+ * @param {number} [weeksCompleted=0]
+ * @returns {Promise<{easyPace: string|null, tempoPace: string|null, longRunPace: string|null}>}
+ */
+export const computePersonalizedPaces = adapter.computePersonalizedPaces
+    || (async () => ({ easyPace: null, tempoPace: null, longRunPace: null }));
+
 // Coach Chat
 export const getCoachHistory = adapter.getCoachHistory;
 export const saveCoachMessage = adapter.saveCoachMessage;
