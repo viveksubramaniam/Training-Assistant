@@ -1,395 +1,484 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from './config/api';
 
-const DailyPlanTab = ({ user, onNavigateToCalendar }) => {
-    const [selectedWorkout, setSelectedWorkout] = useState(null);
+/* --------------------------------------------------------------
+   Home · Focus variant
+   One hero: today's session. No stack of cards, no glass.
+   -------------------------------------------------------------- */
+
+const getTodayInfo = () => {
+    const now = new Date();
+    const dayMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthMap = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return {
+        dayName: dayMap[now.getDay()],
+        dayNumber: now.getDay() === 0 ? 7 : now.getDay(),
+        date: now.getDate(),
+        month: monthMap[now.getMonth()],
+    };
+};
+
+const parseDurationMinutes = (d) => {
+    if (!d) return null;
+    if (typeof d === 'number') return d;
+    const s = String(d).toLowerCase();
+    const m = s.match(/(\d+)\s*m/);
+    if (m) return parseInt(m[1], 10);
+    const h = s.match(/(\d+(?:\.\d+)?)\s*h/);
+    if (h) return Math.round(parseFloat(h[1]) * 60);
+    const pure = s.match(/^\s*(\d+)\s*$/);
+    if (pure) return parseInt(pure[1], 10);
+    return null;
+};
+
+/* Map workout titles to training zones for the effort profile bar */
+const effortProfile = (title = '', targetPace = '') => {
+    const t = (title + ' ' + targetPace).toLowerCase();
+    if (t.includes('interval') || t.includes('threshold') || t.includes('tempo')) {
+        // WU · Z3 · Z4 · Z5 · CD
+        return [1.5, 3, 3, 0.8, 1.5];
+    }
+    if (t.includes('long')) return [1, 5, 2, 0, 1];
+    if (t.includes('recovery') || t.includes('easy') || t.includes('shake')) return [1, 6, 0, 0, 1];
+    if (t.includes('hill') || t.includes('sprint') || t.includes('vo2')) return [1, 2, 2, 3, 1];
+    return [1, 4, 2, 0.5, 1];
+};
+
+const STEP_LABELS = ['WU', 'Z3', 'Z4', 'Z5', 'CD'];
+const STEP_COLORS = [
+    'var(--color-mint)',
+    'var(--color-gold)',
+    'var(--color-ignite)',
+    'var(--color-crimson)',
+    'var(--color-mint)',
+];
+
+/* --------------------------------------------------------------
+   Component
+   -------------------------------------------------------------- */
+
+const DailyPlanTab = ({ user, activities = [], onNavigateToCalendar, onOpenCoach }) => {
     const [loading, setLoading] = useState(true);
-    const [todayFocus, setTodayFocus] = useState([]);
+    const [recommended, setRecommended] = useState(null);
+    const [alternates, setAlternates] = useState([]);
     const [weeklyPlan, setWeeklyPlan] = useState(null);
     const hasTriggeredSync = useRef(false);
 
-    // Dynamic Date Helpers
-    const getCurrentDayInfo = () => {
-        const now = new Date();
-        const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const dayIndex = now.getDay(); // 0 = Sun
-        const isoDay = dayIndex === 0 ? 7 : dayIndex; // 1 = Mon, 7 = Sun
+    const { dayName, dayNumber, date, month } = getTodayInfo();
 
-        return {
-            dayName: dayMap[dayIndex],
-            dayNumber: isoDay, // 1-7
-            date: now.getDate(),
-            month: now.toLocaleDateString('en-US', { month: 'short' })
-        };
-    };
-
-    const { dayName, dayNumber, date, month } = getCurrentDayInfo();
+    // Readiness / load / streak metrics (fall back gracefully when missing)
+    const readiness = user?.readiness ?? user?.hrv_score ?? 82;
+    const load = user?.load ?? user?.training_load ?? 6.4;
+    const streak = user?.streak ?? 0;
 
     useEffect(() => {
-        let isMounted = true;
-        let pollInterval;
+        let mounted = true;
+        let pollT;
+
+        const handleData = (data) => {
+            let rec = null, alts = [];
+
+            if (data.recommended) {
+                rec = data.recommended;
+                alts = [data.option_2, data.option_3].filter(Boolean);
+            } else if (data.dailyPlan) {
+                const dp = data.dailyPlan;
+                rec = dp.base || dp.threshold || dp.recovery;
+                alts = [dp.recovery, dp.threshold].filter(x => x && x !== rec);
+            } else if (Array.isArray(data)) {
+                rec = data.find(x => x.recommended) || data[0];
+                alts = data.filter(x => x !== rec).slice(0, 2);
+            }
+
+            setRecommended(rec);
+            setAlternates(alts);
+            setLoading(false);
+        };
 
         const startProcess = async () => {
             try {
                 const token = localStorage.getItem('authToken');
-                const headers = { 'Authorization': `Bearer ${token}` };
+                const headers = { Authorization: `Bearer ${token}` };
 
-                // Fetch both Daily and Weekly plans
                 const [dailyRes, weeklyRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers }),
-                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers })
+                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers }),
                 ]);
+                const daily = await dailyRes.json();
+                const weekly = await weeklyRes.json();
 
-                const dailyData = await dailyRes.json();
-                const weeklyData = await weeklyRes.json();
-
-                if (dailyData.status === 'generating' || dailyData.status === 'syncing') {
+                if (daily.status === 'generating' || daily.status === 'syncing') {
                     if (!hasTriggeredSync.current) {
                         hasTriggeredSync.current = true;
-                        console.log("Plan missing/generating, triggering sync...");
-                        await fetch(`${API_BASE_URL}/api/coach/sync`, {
-                            method: 'POST',
-                            headers
-                        });
+                        await fetch(`${API_BASE_URL}/api/coach/sync`, { method: 'POST', headers });
                     }
                     pollData();
                 } else {
-                    if (isMounted) {
-                        handlePlanData(dailyData);
-                        if (weeklyData && !weeklyData.status) {
-                            setWeeklyPlan(weeklyData);
-                        }
-                    }
+                    if (!mounted) return;
+                    handleData(daily);
+                    if (weekly && !weekly.status) setWeeklyPlan(weekly);
                 }
-            } catch (error) {
-                console.error("Initial check failed:", error);
+            } catch {
                 pollData();
             }
         };
 
-        const handlePlanData = (data) => {
-            // ... (Existing transformation logic remains exactly the same) ... 
-            // Transform API data to component format
-            // API structure: { recommended: {...}, option_2: {...}, option_3: {...}, ... }
-            let workouts = [];
-
-            // Check for the new format with recommended/option_2/option_3
-            if (data.recommended) {
-                workouts = [
-                    {
-                        level: "Level 1",
-                        levelColor: "text-emerald-400",
-                        duration: data.option_2?.duration || data.option_3?.duration || "25m",
-                        title: data.option_2?.title || data.option_3?.title || "Recovery",
-                        description: data.option_2?.description || data.option_3?.description || "Light activity to promote recovery.",
-                        targetPace: data.option_2?.targetPace || "Easy",
-                        predictedTime: data.option_2?.duration || "25m",
-                        recommended: false,
-                        coachTip: data.option_2?.coachTip
-                    },
-                    {
-                        level: "Level 2",
-                        levelColor: "text-primary",
-                        duration: data.recommended.duration || "45m",
-                        title: data.recommended.title || data.recommended.type || "Training",
-                        description: data.recommended.description || "Complete your planned workout.",
-                        targetPace: data.recommended.targetPace || "Moderate",
-                        predictedTime: data.recommended.duration,
-                        recommended: true,
-                        coachTip: data.recommended.coachTip,
-                        distance: data.recommended.distance
-                    },
-                    {
-                        level: "Level 3",
-                        levelColor: "text-rose-500",
-                        duration: data.option_3?.duration || "30m",
-                        title: data.option_3?.title || "Cross Training",
-                        description: data.option_3?.description || "Alternative training option.",
-                        targetPace: data.option_3?.targetPace || "Varies",
-                        predictedTime: data.option_3?.duration,
-                        recommended: false,
-                        coachTip: data.option_3?.coachTip
-                    }
-                ];
-            } else if (data.dailyPlan) {
-                // Legacy structured plan format (recovery/base/threshold)
-                workouts = [
-                    {
-                        level: "Level 1",
-                        levelColor: "text-emerald-400",
-                        duration: data.dailyPlan.recovery?.duration || "25m",
-                        title: data.dailyPlan.recovery?.type || "Recovery",
-                        description: data.dailyPlan.recovery?.description || "Light activity to promote recovery.",
-                        targetPace: "Easy",
-                        predictedTime: data.dailyPlan.recovery?.duration,
-                        recommended: false
-                    },
-                    {
-                        level: "Level 2",
-                        levelColor: "text-primary",
-                        duration: data.dailyPlan.base?.duration || "45m",
-                        title: data.dailyPlan.base?.type || "Aerobic Base",
-                        description: data.dailyPlan.base?.description || "Steady effort to build endurance.",
-                        targetPace: data.dailyPlan.base?.target_pace || "Moderate",
-                        predictedTime: data.dailyPlan.base?.duration,
-                        recommended: true
-                    },
-                    {
-                        level: "Level 3",
-                        levelColor: "text-rose-500",
-                        duration: data.dailyPlan.threshold?.duration || "30m",
-                        title: data.dailyPlan.threshold?.type || "Threshold",
-                        description: data.dailyPlan.threshold?.description || "Hard effort to improve speed.",
-                        targetPace: data.dailyPlan.threshold?.target_pace || "Hard",
-                        predictedTime: data.dailyPlan.threshold?.duration,
-                        recommended: false
-                    }
-                ];
-            } else if (Array.isArray(data)) {
-                workouts = data;
-            } else {
-                console.warn("Unexpected data format, using fallback", data);
-                setLoading(false);
-                return;
-            }
-
-            setTodayFocus(workouts);
-            setLoading(false);
-        };
-
         const pollData = async () => {
-            if (!isMounted) return;
-
+            if (!mounted) return;
             try {
                 const token = localStorage.getItem('authToken');
-                const headers = { 'Authorization': `Bearer ${token}` };
-
+                const headers = { Authorization: `Bearer ${token}` };
                 const [dailyRes, weeklyRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/coach/daily-plan`, { headers }),
-                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers })
+                    fetch(`${API_BASE_URL}/api/coach/weekly-plan`, { headers }),
                 ]);
-
-                const dailyData = await dailyRes.json();
-                const weeklyData = await weeklyRes.json();
-
-                if (!isMounted) return;
-
-                if (dailyData.status === 'generating' || dailyData.status === 'syncing') {
-                    pollInterval = setTimeout(pollData, 2000);
+                const daily = await dailyRes.json();
+                const weekly = await weeklyRes.json();
+                if (!mounted) return;
+                if (daily.status === 'generating' || daily.status === 'syncing') {
+                    pollT = setTimeout(pollData, 2000);
                     return;
                 }
-
-                handlePlanData(dailyData);
-                if (weeklyData && !weeklyData.status) {
-                    setWeeklyPlan(weeklyData);
-                }
-
-            } catch (error) {
-                console.error("Failed to fetch plan:", error);
+                handleData(daily);
+                if (weekly && !weekly.status) setWeeklyPlan(weekly);
+            } catch (e) {
+                console.error('Poll failed', e);
             }
         };
 
         startProcess();
-
-        return () => {
-            isMounted = false;
-            if (pollInterval) clearTimeout(pollInterval);
-        };
+        return () => { mounted = false; if (pollT) clearTimeout(pollT); };
     }, []);
 
-    // Helper to get future days from weekly plan
-    const getUpcomingDays = () => {
-        if (!weeklyPlan || !weeklyPlan.days) return [];
-
-        // Get local YYYY-MM-DD
+    const getUpcoming = () => {
+        if (!weeklyPlan?.days) return [];
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`;
-
-        // Filter for days strictly after today
-        return weeklyPlan.days.filter(d => d.date > todayStr).slice(0, 5);
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        return weeklyPlan.days.filter(x => x.date > todayStr).slice(0, 4);
     };
+    const upcoming = getUpcoming();
 
-    const upcomingWorkouts = getUpcomingDays();
+    /* ─────────── Render ─────────── */
+
+    // Derived values for the hero card
+    const title = recommended?.title || recommended?.type || (recommended?.activity_type) || 'Rest Day';
+    const description = recommended?.description || 'Take the day. Low-stress recovery activity recommended.';
+    const tag = recommended?.tag
+        || (String(title).toLowerCase().includes('threshold') ? 'Threshold'
+            : String(title).toLowerCase().includes('interval') ? 'Intervals'
+            : String(title).toLowerCase().includes('tempo') ? 'Tempo'
+            : String(title).toLowerCase().includes('long') ? 'Long'
+            : String(title).toLowerCase().includes('recovery') ? 'Recovery'
+            : 'Today');
+    const distance = recommended?.distance || recommended?.distance_km || null;
+    const durationMin = parseDurationMinutes(recommended?.duration);
+    const avgPace = recommended?.targetPace || recommended?.target_pace || '—';
+    const effort = effortProfile(title, avgPace);
+
+    // Split the title for the dramatic 2-line hero typography
+    const [titleLine1, titleLine2] = (() => {
+        const words = String(title).split(' ');
+        if (words.length <= 1) return [words[0] || title, ''];
+        const mid = Math.ceil(words.length / 2);
+        return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+    })();
 
     return (
-        <div className="space-y-6 pb-24">
-
-            {/* Header: No border, simplified to remove separation */}
-            <header className="sticky top-0 z-50 border-none bg-gradient-to-b from-[#0f172a] via-[#0f172a]/80 to-transparent pb-4">
-                <div className="max-w-md mx-auto px-5 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div>
-                            <h1 className="text-base font-bold tracking-tight text-white">STRI<span className="text-primary">IVE</span></h1>
-                            <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Adaptive Coach</p>
-                        </div>
+        <div className="relative flex flex-col min-h-full pb-28">
+            {/* Header */}
+            <div className="px-5 pt-7 flex items-center justify-between">
+                <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.15em]"
+                         style={{ color: 'var(--color-fg-dim)' }}>
+                        {dayName} · {month} {date}
                     </div>
-
-                    {/* Big Streak Bubble */}
-                    <div className="flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 px-3 py-1.5 rounded-full border border-orange-500/30">
-                        <span className="material-symbols-outlined text-orange-500 text-base">local_fire_department</span>
-                        <span className="text-xs font-bold text-orange-400 tracking-wide">{user?.streak || 0} Day Streak</span>
+                    <div className="text-[22px] font-semibold tracking-[-0.02em] mt-[2px]">
+                        Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'},
+                        {' '}
+                        {user?.name?.split(' ')[0] || 'athlete'}
                     </div>
                 </div>
-            </header>
+                <button
+                    className="flex items-center justify-center"
+                    style={{
+                        width: 36, height: 36, borderRadius: 18,
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-line)',
+                        color: 'var(--color-fg-muted)',
+                    }}
+                    title="Notifications"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 17h5l-2-2V9a6 6 0 10-12 0v6l-2 2h5m6 0v1a3 3 0 01-6 0v-1"/>
+                    </svg>
+                </button>
+            </div>
 
+            {/* Readiness / Load / Streak strip */}
+            <div className="mx-5 mt-5 grid grid-cols-3 gap-2">
+                {[
+                    { l: 'Readiness', v: String(readiness), u: '%', c: 'var(--color-mint)' },
+                    { l: 'Load',      v: String(load),      u: '',  c: 'var(--color-ignite)' },
+                    { l: 'Streak',    v: String(streak),    u: 'd', c: 'var(--color-fg)' },
+                ].map(m => (
+                    <div key={m.l}
+                         style={{
+                             background: 'var(--color-surface)',
+                             border: '1px solid var(--color-line)',
+                             borderRadius: 12,
+                             padding: '10px 12px',
+                         }}>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+                             style={{ color: 'var(--color-fg-dim)' }}>{m.l}</div>
+                        <div className="mono-data flex items-baseline gap-[2px] mt-1">
+                            <span className="text-[22px] font-semibold tracking-[-0.03em]"
+                                  style={{ color: m.c }}>{m.v}</span>
+                            <span className="text-[11px]" style={{ color: 'var(--color-fg-dim)' }}>{m.u}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Hero session card */}
             {loading ? (
-                <div className="flex flex-col items-center justify-center h-[50vh] animate-pulse px-6 text-center">
-                    <p className="text-sm font-medium text-slate-400 bg-slate-800/50 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5">
-                        Hold tight while we get your plans in order...
-                    </p>
+                <div
+                    className="mx-5 mt-4 flex items-center justify-center"
+                    style={{
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-line)',
+                        borderRadius: 22,
+                        minHeight: 420,
+                    }}
+                >
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="pulse-ring w-8 h-8 rounded-full"
+                             style={{ border: '2px solid var(--color-ignite)' }}/>
+                        <p className="mono-data text-[11px] uppercase tracking-[0.18em]"
+                           style={{ color: 'var(--color-fg-dim)' }}>
+                            Building your plan
+                        </p>
+                    </div>
                 </div>
             ) : (
-                <main className="max-w-md mx-auto px-5 py-2 space-y-8">
+                <div
+                    className="mx-5 mt-4 relative overflow-hidden grain"
+                    style={{
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-line)',
+                        borderRadius: 22,
+                        padding: 24,
+                    }}
+                >
+                    {/* corner glow */}
+                    <div
+                        aria-hidden
+                        style={{
+                            position: 'absolute', top: -60, right: -60,
+                            width: 200, height: 200, borderRadius: 100,
+                            background: 'var(--color-ignite)',
+                            opacity: 0.12, filter: 'blur(40px)',
+                        }}
+                    />
 
-                    {/* 1. Today's Focus Section */}
-                    <section className="space-y-4">
-                        <div className="flex items-baseline justify-between">
-                            <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">Today's Focus</h2>
-                            <span className="text-[10px] font-medium opacity-50 uppercase text-slate-500">{month} {date}</span>
+                    <div className="relative flex items-start justify-between">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                             style={{ color: 'var(--color-ignite)' }}>
+                            Today's Session
                         </div>
+                        <div
+                            className="text-[10px] font-semibold uppercase tracking-[0.08em] px-2 py-[3px]"
+                            style={{
+                                borderRadius: 4,
+                                background: 'color-mix(in oklch, var(--color-ignite) 12%, transparent)',
+                                color: 'var(--color-ignite)',
+                            }}
+                        >
+                            {tag}
+                        </div>
+                    </div>
 
-                        {/* Expandable Card Logic */}
-                        {selectedWorkout ? (
-                            /* Expanded View */
-                            <div className="glass-card p-6 rounded-2xl border border-primary/30 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in duration-300">
-                                {/* Back Button */}
-                                <button
-                                    onClick={() => setSelectedWorkout(null)}
-                                    className="absolute top-4 right-4 p-2 rounded-full bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                                >
-                                    <span className="material-symbols-outlined text-xl">close</span>
-                                </button>
+                    <div className="relative mt-4 font-semibold tracking-[-0.04em] leading-[1.05] text-[34px]">
+                        {titleLine1}{titleLine2 && <><br/>{titleLine2}</>}
+                    </div>
+                    <p className="relative mt-2 text-[14px] leading-[1.45] max-w-[280px]"
+                       style={{ color: 'var(--color-fg-muted)' }}>
+                        {description}
+                    </p>
 
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[10px] font-bold uppercase tracking-widest ${selectedWorkout.levelColor}`}>
-                                                {selectedWorkout.level}
-                                            </span>
-                                            <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
-                                                {selectedWorkout.duration}
-                                            </span>
-                                        </div>
-                                        <h3 className="text-xl font-bold text-white leading-tight mb-2">{selectedWorkout.title}</h3>
-                                        <p className="text-sm text-slate-400 leading-relaxed font-medium mb-3">
-                                            {selectedWorkout.description}
-                                        </p>
-
-                                        {/* Simplified Stats */}
-                                        <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="material-symbols-outlined text-primary text-base">speed</span>
-                                                <span>{selectedWorkout.targetPace}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 ">
-                                                <span className="material-symbols-outlined text-emerald-400 text-base">timer</span>
-                                                <span>{selectedWorkout.predictedTime}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Button */}
-                                    <button className="w-full py-3 bg-primary rounded-xl font-bold text-white text-sm shadow-lg shadow-orange-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-orange-600">
-                                        <span className="material-symbols-outlined text-lg">check_circle</span>
-                                        Mark as Completed
-                                    </button>
+                    {/* Stats row */}
+                    <div className="relative mt-5 pt-4 grid grid-cols-3"
+                         style={{ borderTop: '1px solid var(--color-line)' }}>
+                        {[
+                            { l: 'Distance', v: distance ? String(distance) : '—', u: 'km' },
+                            { l: 'Duration', v: durationMin ? String(durationMin) : '—', u: 'min' },
+                            { l: 'Avg pace', v: avgPace, u: '/km' },
+                        ].map((s, i) => (
+                            <div key={s.l}
+                                 style={{
+                                     borderLeft: i > 0 ? '1px solid var(--color-line)' : 'none',
+                                     paddingLeft: i > 0 ? 14 : 0,
+                                 }}>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+                                     style={{ color: 'var(--color-fg-dim)' }}>{s.l}</div>
+                                <div className="mono-data text-[20px] font-medium mt-1 tracking-[-0.03em]">
+                                    {s.v}
+                                    <span className="text-[11px] ml-1" style={{ color: 'var(--color-fg-dim)' }}>{s.u}</span>
                                 </div>
                             </div>
-                        ) : (
-                            /* List View */
-                            <div className="flex flex-col gap-3">
-                                {todayFocus.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setSelectedWorkout(item)}
-                                        className={`glass-card p-4 rounded-xl flex items-center gap-4 relative overflow-hidden group transition-all duration-300 active:scale-[0.98] cursor-pointer border ${item.recommended ? 'bg-gradient-to-r from-slate-800 to-slate-900 border-primary/40 shadow-xl shadow-orange-900/10' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'}`}
-                                    >
-                                        {item.recommended && (
-                                            <div className="absolute top-0 right-0 px-2 py-1 bg-primary text-[8px] font-bold text-white uppercase rounded-bl-lg">
-                                                Recommended
-                                            </div>
-                                        )}
+                        ))}
+                    </div>
 
-                                        <div className="flex-1 relative z-10 pl-2">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-[9px] font-bold uppercase tracking-widest ${item.levelColor}`}>
-                                                    {item.level}
-                                                </span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                                <span className={`text-[10px] font-medium ${item.recommended ? 'text-primary' : 'opacity-60 text-white'}`}>{item.duration}</span>
-                                            </div>
-                                            <h3 className="text-sm font-bold text-white leading-tight">{item.title}</h3>
-                                        </div>
-
-                                        <span className="material-symbols-outlined text-slate-600">chevron_right</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-
-                    {/* 2. Week Progress (Dynamic) */}
-                    <section className="glass-card bg-gradient-to-br from-indigo-900/20 to-slate-900/50 p-5 rounded-2xl border border-indigo-500/20 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-20">
-                            <span className="material-symbols-outlined text-6xl text-white">flag</span>
+                    {/* Effort profile */}
+                    <div className="relative mt-5">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.08em] mb-2"
+                             style={{ color: 'var(--color-fg-dim)' }}>
+                            Effort profile
                         </div>
-
-                        <div className="flex items-center gap-6 relative z-10">
-                            {/* Points Figure / Progress Circle */}
-                            <div className="relative w-20 h-20 flex-none">
-                                <svg className="w-full h-full -rotate-90 drop-shadow-xl" viewBox="0 0 100 100">
-                                    <circle className="text-slate-800" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeWidth="8"></circle>
-                                    <circle className="text-primary" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeDasharray={`${(dayNumber / 7) * 263.8} 263.8`} strokeLinecap="round" strokeWidth="8"></circle>
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-xl font-bold text-white leading-none tracking-tight">{Math.round((dayNumber / 7) * 100)}%</span>
-                                    <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">Week</span>
-                                </div>
-                            </div>
-
-                            {/* Text Content */}
-                            <div className="space-y-1">
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">Week Progress</h3>
-                                <p className="text-xl font-bold text-white">Day {dayNumber} <span className="text-slate-500 text-base font-medium">/ 7</span></p>
-                                <p className="text-xs text-indigo-200/60 leading-relaxed">It's {dayName}! Keep consistent with your weekly plan.</p>
-                            </div>
+                        <div className="flex gap-[2px] h-2 rounded overflow-hidden">
+                            {effort.map((w, i) => w > 0 ? (
+                                <div key={i} style={{ flex: w, background: STEP_COLORS[i] }}/>
+                            ) : null)}
                         </div>
-                    </section>
-
-                    {/* 3. The Road Ahead (Synced with Weekly Plan) */}
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xs font-bold tracking-widest uppercase text-slate-400">The Road Ahead</h2>
-                            <button className="text-[10px] font-medium text-primary hover:text-orange-300 transition-colors" onClick={onNavigateToCalendar}>Full Calendar</button>
+                        <div className="flex justify-between mt-[6px] mono-data text-[9px]"
+                             style={{ color: 'var(--color-fg-dim)', letterSpacing: '0.06em' }}>
+                            {STEP_LABELS.map((s, i) => effort[i] > 0 ? <span key={i}>{s}</span> : <span key={i} style={{ opacity: 0 }}>{s}</span>)}
                         </div>
-                        <div className="flex overflow-x-auto gap-4 hide-scrollbar pb-4 -mx-5 px-5 snap-x">
-                            {upcomingWorkouts.length > 0 ? (
-                                upcomingWorkouts.map((day, idx) => (
-                                    <div key={idx} className="flex-none w-36 glass-card bg-slate-800/50 p-4 rounded-xl border-l-4 border-l-primary snap-center flex flex-col justify-between h-28">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-primary uppercase tracking-widest">{day.dayName}</p>
-                                            <h4 className="text-sm font-bold mt-1 text-white leading-tight line-clamp-2">{day.title || day.activity_type || "Rest Day"}</h4>
-                                        </div>
-                                        <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                                            <span className="text-[10px] font-mono text-slate-400">{day.distance ? `${day.distance}km` : 'Recovery'}</span>
-                                            <span className="material-symbols-outlined text-sm text-primary">bolt</span>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="w-full text-center py-4 text-slate-500 text-xs">
-                                    No upcoming workouts this week.
-                                </div>
-                            )}
-                        </div>
-                    </section>
+                    </div>
 
-                </main>
+                    {/* Primary action */}
+                    <button
+                        onClick={onOpenCoach}
+                        className="relative mt-6 w-full h-[54px] flex items-center justify-center gap-2 font-display text-[16px] font-semibold active:scale-[0.985] transition"
+                        style={{
+                            borderRadius: 14,
+                            background: 'var(--color-ignite)',
+                            color: '#fff',
+                            border: 'none',
+                            letterSpacing: '0.01em',
+                            boxShadow: '0 14px 30px -10px color-mix(in oklch, var(--color-ignite) 60%, transparent)',
+                        }}
+                    >
+                        Start workout
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14M13 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+
+                    <div className="relative mt-[10px] flex gap-[10px]">
+                        <button
+                            onClick={onOpenCoach}
+                            className="flex-1 h-[42px] text-[13px] font-medium font-display transition"
+                            style={{
+                                borderRadius: 12,
+                                background: 'transparent',
+                                border: '1px solid var(--color-line)',
+                                color: 'var(--color-fg-muted)',
+                            }}
+                        >
+                            Swap workout
+                        </button>
+                        <button
+                            className="flex-1 h-[42px] text-[13px] font-medium font-display transition"
+                            style={{
+                                borderRadius: 12,
+                                background: 'transparent',
+                                border: '1px solid var(--color-line)',
+                                color: 'var(--color-fg-muted)',
+                            }}
+                        >
+                            Mark as rest
+                        </button>
+                    </div>
+                </div>
             )}
+
+            {/* Alternate workouts (compact chips, not stacked cards) */}
+            {alternates.length > 0 && (
+                <div className="mx-5 mt-6">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] mb-2"
+                         style={{ color: 'var(--color-fg-dim)' }}>
+                        Alternates
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+                        {alternates.map((a, i) => (
+                            <button
+                                key={i}
+                                onClick={onOpenCoach}
+                                className="shrink-0 text-left px-3 py-[10px] min-w-[180px]"
+                                style={{
+                                    background: 'var(--color-surface)',
+                                    border: '1px solid var(--color-line)',
+                                    borderRadius: 12,
+                                }}
+                            >
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+                                     style={{ color: 'var(--color-fg-dim)' }}>
+                                    {a.tag || a.type || 'Alt'}
+                                </div>
+                                <div className="text-[13px] font-semibold mt-1 leading-tight">
+                                    {a.title || a.type || 'Workout'}
+                                </div>
+                                <div className="mono-data text-[11px] mt-[2px]"
+                                     style={{ color: 'var(--color-fg-muted)' }}>
+                                    {a.duration || '—'} · {a.targetPace || a.target_pace || a.intensity || ''}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Road ahead */}
+            <div className="mx-5 mt-6">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                         style={{ color: 'var(--color-fg-dim)' }}>
+                        Road ahead
+                    </div>
+                    <button onClick={onNavigateToCalendar}
+                            className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+                            style={{ color: 'var(--color-ignite)' }}>
+                        Full plan →
+                    </button>
+                </div>
+                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 snap-x">
+                    {upcoming.length === 0 ? (
+                        <div className="w-full text-[11px] py-3 text-center"
+                             style={{ color: 'var(--color-fg-dim)' }}>
+                            No upcoming sessions this week
+                        </div>
+                    ) : upcoming.map((day, i) => (
+                        <div key={i}
+                             className="shrink-0 snap-center"
+                             style={{
+                                 width: 148,
+                                 padding: 12,
+                                 borderRadius: 14,
+                                 background: 'var(--color-surface)',
+                                 border: '1px solid var(--color-line)',
+                                 borderLeft: `3px solid var(--color-ignite)`,
+                             }}>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+                                 style={{ color: 'var(--color-ignite)' }}>
+                                {day.dayName || day.day_name || ''}
+                            </div>
+                            <div className="text-[13px] font-semibold mt-[6px] leading-tight line-clamp-2">
+                                {day.title || day.activity_type || 'Rest'}
+                            </div>
+                            <div className="mono-data text-[10px] mt-[10px] pt-[8px]"
+                                 style={{
+                                     color: 'var(--color-fg-dim)',
+                                     borderTop: '1px solid var(--color-line)',
+                                 }}>
+                                {day.distance ? `${day.distance} km` : 'Recovery'}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 };
