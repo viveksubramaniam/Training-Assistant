@@ -621,6 +621,107 @@ router.get('/chat/history', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/coach/swap-workout
+ * Swap the current day's workout with an alternate option
+ */
+router.post('/swap-workout', requireAuth, async (req, res) => {
+    const userId = req.userId;
+    const { alternateTitle } = req.body;
+
+    try {
+        const weekStart = getWeekStart();
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get current weekly plan
+        const weeklyPlan = await db.getWeeklyPlanCache(userId, weekStart);
+        if (!weeklyPlan || !weeklyPlan.days) {
+            return res.status(400).json({ error: 'No weekly plan found' });
+        }
+
+        // Find today's workout and the matching alternate
+        const todayIndex = weeklyPlan.days.findIndex(d => matchDay(d, today));
+        if (todayIndex === -1) {
+            return res.status(400).json({ error: 'Could not find today in the weekly plan' });
+        }
+
+        const currentWorkout = weeklyPlan.days[todayIndex];
+
+        // Log the swap action
+        console.log(`[SwapWorkout] User ${userId} swapping "${currentWorkout.title}" with "${alternateTitle}"`);
+
+        // Create a note of the swap in the daily plan cache
+        const today_iso = new Date().toISOString().split('T')[0];
+        const dailyCache = await db.getDailyPlanCache(userId, today_iso);
+
+        if (dailyCache && dailyCache.plan_data) {
+            const dailyPlan = dailyCache.plan_data;
+
+            // Create a swapped version - replace the recommended with the alternate if available
+            const swappedRecommended = {
+                title: alternateTitle,
+                type: 'swapped',
+                description: `Swapped from: ${currentWorkout.title}. You chose to replace your scheduled workout with this alternative.`,
+                distance: dailyPlan.option_2?.distance || dailyPlan.option_3?.distance || currentWorkout.distance,
+                targetPace: dailyPlan.option_2?.targetPace || dailyPlan.option_3?.target_pace || currentWorkout.target_pace,
+                duration: dailyPlan.option_2?.duration || dailyPlan.option_3?.duration || currentWorkout.target_time,
+                coachTip: 'You\'ve made your choice. Go get it!'
+            };
+
+            // Update the daily plan cache
+            const updatedDailyPlan = {
+                ...dailyPlan,
+                recommended: swappedRecommended,
+                swapped: true,
+                swappedFrom: currentWorkout.title,
+                swappedTo: alternateTitle
+            };
+
+            await db.cacheDailyPlan(userId, today_iso, updatedDailyPlan);
+        }
+
+        // Update the weekly plan if needed
+        const updatedDays = weeklyPlan.days.map((d, i) => {
+            if (i === todayIndex) {
+                return {
+                    ...d,
+                    title: alternateTitle,
+                    swapped: true,
+                    originalTitle: d.title
+                };
+            }
+            return d;
+        });
+
+        const updatedWeeklyPlan = { ...weeklyPlan, days: updatedDays };
+        await db.cacheWeeklyPlan(userId, weekStart, updatedWeeklyPlan);
+
+        // Save the action to coach history
+        await db.saveCoachMessage(userId, 'system', `Swapped workout: ${currentWorkout.title} → ${alternateTitle}`, {
+            action: 'swap_workouts',
+            from: currentWorkout.title,
+            to: alternateTitle,
+            date: today_iso
+        });
+
+        console.log(`[SwapWorkout] Successfully swapped workout for user ${userId}`);
+        res.json({
+            success: true,
+            message: `Swapped to ${alternateTitle}`,
+            swappedFrom: currentWorkout.title,
+            swappedTo: alternateTitle,
+            date: today_iso
+        });
+
+    } catch (error) {
+        console.error('[SwapWorkout] Failed:', error.message);
+        res.status(500).json({
+            error: 'Failed to swap workout',
+            details: error.message
+        });
+    }
+});
+
+/**
  * POST /api/coach/chat
  * Enhanced chat with AI coach - handles goal CRUD, workout modifications, and plan changes
  */
