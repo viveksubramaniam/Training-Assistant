@@ -55,6 +55,26 @@ const formatPaceFromSpeed = (speedMps) => {
     return `${m}:${s}`;
 };
 
+const paceToSeconds = (paceStr) => {
+    if (!paceStr || paceStr === '—') return 0;
+    const parts = paceStr.split(':');
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+};
+
+const speedToPace = (speedMps) => {
+    if (!speedMps || speedMps <= 0) return null;
+    const secPerKm = 1000 / speedMps;
+    return secPerKm;
+};
+
+const formatZoneLabel = (zoneType) => {
+    if (!zoneType) return 'Zone';
+    const normalized = zoneType.toLowerCase();
+    if (normalized === 'custom') return 'Custom';
+    if (normalized === 'heartrate') return 'HR Zone';
+    return zoneType;
+};
+
 /* --------------------------------------------------------------
    HR Trace — inline SVG area chart
    -------------------------------------------------------------- */
@@ -90,6 +110,152 @@ const HRTrace = ({ data }) => {
             <path d={d} stroke="var(--color-crimson)" strokeWidth="1.5" fill="none"/>
             <path d={`${d} L${W} ${H} L0 ${H} Z`} fill="var(--color-crimson)" opacity="0.15"/>
         </svg>
+    );
+};
+
+/* --------------------------------------------------------------
+   Pace Chart — inline SVG line chart showing pace progression
+   -------------------------------------------------------------- */
+
+const PaceChart = ({ data }) => {
+    if (!data || data.length < 2) {
+        return (
+            <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none" style={{ marginTop: 8 }}>
+                <path d="M0 35 L50 25 L100 40 L150 30 L200 35 L250 28 L300 40" stroke="var(--color-gold)" strokeWidth="1.5" fill="none"/>
+                <path d="M0 35 L50 25 L100 40 L150 30 L200 35 L250 28 L300 40 L300 60 L0 60 Z" fill="var(--color-gold)" opacity="0.15"/>
+            </svg>
+        );
+    }
+
+    const W = 300, H = 60;
+    const clean = data.filter(v => v !== null && v !== undefined && v > 0);
+    if (clean.length < 2) {
+        return (
+            <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none" style={{ marginTop: 8 }}>
+                <text x="150" y="30" textAnchor="middle" fill="var(--color-fg-dim)" fontSize="12">
+                    Pace data unavailable
+                </text>
+            </svg>
+        );
+    }
+
+    const min = Math.min(...clean);
+    const max = Math.max(...clean);
+    const span = Math.max(1, max - min);
+
+    const stepX = W / (data.length - 1);
+    let d = '';
+    data.forEach((v, i) => {
+        const x = i * stepX;
+        const paceSeconds = v && v > 0 ? v : null;
+        const y = paceSeconds == null ? H : H - 4 - ((paceSeconds - min) / span) * (H - 8);
+        d += `${i === 0 ? 'M' : ' L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+
+    return (
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ marginTop: 8 }}>
+            <path d={d} stroke="var(--color-gold)" strokeWidth="1.5" fill="none"/>
+            <path d={`${d} L${W} ${H} L0 ${H} Z`} fill="var(--color-gold)" opacity="0.15"/>
+        </svg>
+    );
+};
+
+/* --------------------------------------------------------------
+   Effort Zones — displays zone time distribution
+   -------------------------------------------------------------- */
+
+const EffortZonesCard = ({ zones, maxHr }) => {
+    if (!zones || zones.length === 0) {
+        return null;
+    }
+
+    // Filter zones to find HR zones
+    const hrZones = zones.filter(z => z.type === 'heartrate');
+    if (hrZones.length === 0) {
+        return null;
+    }
+
+    const zoneData = hrZones[0];
+    if (!zoneData.distribution_buckets) {
+        return null;
+    }
+
+    // Calculate total time in zones
+    const buckets = zoneData.distribution_buckets;
+    const totalTime = buckets.reduce((sum, b) => sum + (b.time || 0), 0);
+
+    if (totalTime === 0) {
+        return null;
+    }
+
+    const zoneColors = [
+        { name: 'Zone 1', color: 'var(--color-mint)' },
+        { name: 'Zone 2', color: 'var(--color-gold)' },
+        { name: 'Zone 3', color: 'var(--color-ignite)' },
+        { name: 'Zone 4', color: 'var(--color-crimson)' },
+        { name: 'Zone 5', color: 'var(--color-crimson)' },
+    ];
+
+    return (
+        <div className="mx-5 mt-4 p-[14px]"
+             style={{
+                 background: 'var(--color-surface)',
+                 borderRadius: 12,
+                 border: '1px solid var(--color-line)',
+             }}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-[10px]"
+                 style={{ color: 'var(--color-fg-dim)' }}>
+                Effort Zones
+            </div>
+
+            {/* Zone distribution bar */}
+            <div className="flex gap-1 mb-[12px]" style={{ height: 32 }}>
+                {buckets.map((bucket, idx) => {
+                    const percentage = (bucket.time / totalTime) * 100;
+                    const zoneColor = zoneColors[idx] || { name: `Zone ${idx + 1}`, color: 'var(--color-fg-dim)' };
+
+                    return percentage > 0 ? (
+                        <div
+                            key={idx}
+                            style={{
+                                flex: percentage,
+                                background: zoneColor.color,
+                                borderRadius: 8,
+                                opacity: 0.8,
+                                position: 'relative',
+                            }}
+                            title={`${zoneColor.name}: ${formatDuration(bucket.time)}`}
+                        />
+                    ) : null;
+                })}
+            </div>
+
+            {/* Zone legend */}
+            <div className="grid grid-cols-2 gap-[8px]">
+                {buckets.map((bucket, idx) => {
+                    const percentage = (bucket.time / totalTime) * 100;
+                    const zoneColor = zoneColors[idx] || { name: `Zone ${idx + 1}`, color: 'var(--color-fg-dim)' };
+
+                    if (percentage === 0) return null;
+
+                    return (
+                        <div key={idx} className="flex items-center gap-2">
+                            <div style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: 2,
+                                background: zoneColor.color,
+                                opacity: 0.8,
+                            }} />
+                            <div className="text-[11px]" style={{ color: 'var(--color-fg-muted)' }}>
+                                <span className="font-medium">{zoneColor.name}</span>
+                                <span style={{ color: 'var(--color-fg-dim)' }}> {percentage.toFixed(0)}%</span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 };
 
@@ -144,7 +310,11 @@ const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
     const avgHr = details?.average_heartrate || activity.average_heartrate;
     const maxHr = details?.max_heartrate;
     const elevation = details?.total_elevation_gain != null ? Math.round(details.total_elevation_gain) : '—';
-    const calories = details?.calories || '—';
+    const calories = details?.calories ? Math.round(details.calories) : '—';
+    const perceivedExertion = details?.perceived_exertion || null;
+
+    // Format calories with thousands separator
+    const caloriesFormatted = calories !== '—' ? calories.toLocaleString() : '—';
 
     const dateObj = new Date(activity.start_date || activity.date);
     const dateStr = !isNaN(dateObj)
@@ -158,6 +328,13 @@ const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
     const smoothedHr = rollingAverage(rawHr, 20);
     const sampleRate = Math.max(1, Math.floor(smoothedHr.length / 120));
     const hrTrace = smoothedHr.filter((_, i) => i % sampleRate === 0);
+
+    // Pace trace from velocity_smooth
+    const rawVelocity = details?.streams?.velocity_smooth?.data || [];
+    const paceData = rawVelocity.map(v => speedToPace(v));
+    const smoothedPace = rollingAverage(paceData, 20);
+    const paceSampleRate = Math.max(1, Math.floor(smoothedPace.length / 120));
+    const paceTrace = smoothedPace.filter((_, i) => i % paceSampleRate === 0);
 
     const coachHeadline = aiSummary?.highlight || aiSummary?.summary
         || "Review this session with your coach for insights on pacing and effort distribution.";
@@ -279,7 +456,7 @@ const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
                     </div>
                 </div>
 
-                {/* 6 stat grid */}
+                {/* 8 stat grid (2x4) with key metrics */}
                 <div className="mx-5 mt-4 grid grid-cols-2 gap-2">
                     {[
                         { l: 'Distance',  v: distanceKm,  u: 'km' },
@@ -287,7 +464,9 @@ const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
                         { l: 'Avg pace',  v: avgPace,     u: avgPace !== '—' ? '/km' : '' },
                         { l: 'Avg HR',    v: avgHr ? Math.round(avgHr) : '—', u: avgHr ? 'bpm' : '' },
                         { l: 'Elevation', v: elevation,   u: elevation !== '—' ? 'm' : '' },
-                        { l: 'Calories',  v: calories,    u: calories !== '—' ? 'kcal' : '' },
+                        { l: 'Calories',  v: caloriesFormatted,    u: caloriesFormatted !== '—' ? 'kcal' : '' },
+                        ...(perceivedExertion !== null ? [{ l: 'Effort',     v: perceivedExertion,  u: '/10' }] : []),
+                        ...(maxHr ? [{ l: 'Max HR',    v: Math.round(maxHr), u: 'bpm' }] : []),
                     ].map(s => (
                         <div key={s.l}
                              style={{
@@ -321,11 +500,38 @@ const ActivityDetailPage = ({ activity, onClose, onAskCoach }) => {
                         {maxHr && (
                             <div className="mono-data text-[11px]" style={{ color: 'var(--color-crimson)' }}>
                                 max {Math.round(maxHr)}
+                                {avgHr && <span style={{ color: 'var(--color-fg-dim)' }}> ({Math.round((avgHr / maxHr) * 100)}% avg)</span>}
                             </div>
                         )}
                     </div>
                     <HRTrace data={hrTrace}/>
                 </div>
+
+                {/* Pace card */}
+                {paceTrace && paceTrace.length > 0 && (
+                    <div className="mx-5 mt-4 p-[14px]"
+                         style={{
+                             background: 'var(--color-surface)',
+                             borderRadius: 12,
+                             border: '1px solid var(--color-line)',
+                         }}>
+                        <div className="flex justify-between items-center">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                                 style={{ color: 'var(--color-fg-dim)' }}>
+                                Pace progression
+                            </div>
+                            {avgPace && avgPace !== '—' && (
+                                <div className="mono-data text-[11px]" style={{ color: 'var(--color-gold)' }}>
+                                    avg {avgPace} /km
+                                </div>
+                            )}
+                        </div>
+                        <PaceChart data={paceTrace}/>
+                    </div>
+                )}
+
+                {/* Effort Zones */}
+                <EffortZonesCard zones={details?.zones} maxHr={maxHr}/>
 
                 {/* Coach insight */}
                 <div className="mx-5 mt-3 p-[14px]"
