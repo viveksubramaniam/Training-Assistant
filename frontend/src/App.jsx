@@ -3,6 +3,7 @@ import DailyPlanTab from './DailyPlanTab';
 import CalendarPage from './CalendarPage';
 import ProfilePage from './ProfilePage';
 import ActivityDetailPage from './ActivityDetailPage';
+import AlternateWorkoutModal from './components/AlternateWorkoutModal';
 import ChatWidget from './components/ChatWidget';
 import { API_BASE_URL } from './config/api';
 
@@ -433,6 +434,7 @@ const App = () => {
 
     const [activities, setActivities] = useState([]);
     const [selectedActivity, setSelectedActivity] = useState(null);
+    const [selectedAlternate, setSelectedAlternate] = useState(null);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -556,7 +558,8 @@ const App = () => {
                 user={user}
                 activities={activities}
                 onNavigateToCalendar={() => go('#/plan')}
-                onOpenCoach={() => setShowChat(true)}
+                onOpenCoach={() => go('#/coach')}
+                onSelectAlternate={(alternate) => setSelectedAlternate(alternate)}
                 onStartWorkout={() => {/* hook into logging later */}}
             />
         );
@@ -636,6 +639,21 @@ const App = () => {
                             else go('#/activity');
                         }}
                         onAskCoach={() => go('#/coach')}
+                    />
+                </div>
+            )}
+
+            {/* Alternate workout overlay */}
+            {selectedAlternate && (
+                <div className="absolute inset-0 z-50 page-rise"
+                     style={{ background: 'var(--color-bg)' }}>
+                    <AlternateWorkoutModal
+                        workout={selectedAlternate}
+                        onClose={() => setSelectedAlternate(null)}
+                        onSwap={() => {
+                            setSelectedAlternate(null);
+                            go('#/coach');
+                        }}
                     />
                 </div>
             )}
