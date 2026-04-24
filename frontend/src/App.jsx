@@ -5,13 +5,14 @@ import ProfilePage from './ProfilePage';
 import ActivityDetailPage from './ActivityDetailPage';
 import AlternateWorkoutModal from './components/AlternateWorkoutModal';
 import ChatWidget from './components/ChatWidget';
+import NutritionPage from './NutritionPage';
 import { API_BASE_URL } from './config/api';
 
 import StravaLoginButton from './components/LoginButton';
 
 /* -------------------------------------------------------------------------- */
 /*  Hash-based routing                                                        */
-/*  #/home  #/plan  #/activity  #/activity/:id  #/coach  #/profile  #/login   */
+/*  #/home  #/plan  #/activity  #/activity/:id  #/coach  #/fuel  #/profile  #/login   */
 /* -------------------------------------------------------------------------- */
 
 const parseHash = () => {
@@ -147,9 +148,9 @@ const LoginScreen = () => {
 const BottomNav = ({ active }) => {
     const items = [
         { id: 'home',    to: '#/home',     label: 'Today',    icon: I.home },
-        { id: 'plan',    to: '#/plan',     label: 'Plan',     icon: I.plan },
-        { id: 'coach',   to: '#/coach',    label: 'Coach',    icon: I.coach, center: true },
         { id: 'stats',   to: '#/activity', label: 'Activity', icon: I.stats },
+        { id: 'coach',   to: '#/coach',    label: 'Coach',    icon: I.coach, center: true },
+        { id: 'fuel',    to: '#/fuel',     label: 'Fuel',     icon: I.plan },
         { id: 'profile', to: '#/profile',  label: 'You',      icon: I.profile },
     ];
 
@@ -542,10 +543,10 @@ const App = () => {
     /* ----------- Determine active nav tab from route ----------- */
     const activeTab =
         routeTop === 'home' ? 'home'
-        : routeTop === 'plan' ? 'plan'
         : routeTop === 'activity' ? 'stats'
-        : routeTop === 'profile' ? 'profile'
         : routeTop === 'coach' ? 'coach'
+        : routeTop === 'fuel' ? 'fuel'
+        : routeTop === 'profile' ? 'profile'
         : 'home';
 
     /* ----------- Which page to render ----------- */
@@ -603,6 +604,9 @@ const App = () => {
                 }}
             />
         );
+    } else if (routeTop === 'fuel') {
+        pageKey = 'fuel';
+        pageNode = <NutritionPage user={user} />;
     } else {
         pageKey = 'activity';
         pageNode = (
