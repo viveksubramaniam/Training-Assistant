@@ -34,7 +34,7 @@ const BrainSVG = ({ size = 14, color = 'var(--color-fg)' }) => (
 
 const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!" }
+        { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!", timestamp: Date.now() }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -82,7 +82,7 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
 
         setInput('');
         setShowSuggestions(false);
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setMessages(prev => [...prev, { role: 'user', content: userMessage, timestamp: Date.now() }]);
         setIsLoading(true);
 
         try {
@@ -96,14 +96,22 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
                 body: JSON.stringify({ message: userMessage })
             });
 
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
             const data = await response.json();
+            if (!data.message) {
+                throw new Error('Invalid response format from API');
+            }
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: data.message,
                 action: data.action,
                 planUpdate: data.planUpdate,
-                goalChanged: data.goalChanged
+                goalChanged: data.goalChanged,
+                timestamp: Date.now()
             }]);
 
             // Notify parent about plan updates
@@ -119,7 +127,8 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
         } catch (error) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: "I'm having trouble connecting. Let's try again."
+                content: "I'm having trouble connecting. Let's try again.",
+                timestamp: Date.now()
             }]);
         } finally {
             setIsLoading(false);
@@ -263,9 +272,9 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
                 flexDirection: 'column',
                 gap: 16,
             }}>
-                {messages.map((msg, idx) => (
+                {messages.map((msg) => (
                     <div
-                        key={idx}
+                        key={`${msg.role}-${msg.timestamp}-${msg.content.substring(0, 10)}`}
                         style={{
                             display: 'flex',
                             justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
@@ -365,9 +374,9 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
             {showSuggestions && messages.length <= 2 && (
                 <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
                     <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                        {QUICK_SUGGESTIONS.map((suggestion, idx) => (
+                        {QUICK_SUGGESTIONS.map((suggestion) => (
                             <button
-                                key={idx}
+                                key={`suggestion-${suggestion.label}`}
                                 onClick={() => handleSuggestionClick(suggestion)}
                                 disabled={isLoading}
                                 style={{
