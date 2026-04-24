@@ -5,7 +5,6 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
     const [targetDate, setTargetDate] = useState('');
     const [weeklyTarget, setWeeklyTarget] = useState(40);
     const [preferredDays, setPreferredDays] = useState(['Mon', 'Wed', 'Fri', 'Sun']);
-    const [saving, setSaving] = useState(false);
     const [inputFocused, setInputFocused] = useState(null);
 
     const goalTypes = ['5K', '10K', 'Half Marathon', 'Marathon', 'General Fitness'];
@@ -277,7 +276,6 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={saving}
                         style={{
                             flex: 1,
                             padding: '12px 16px',
@@ -288,7 +286,6 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                             fontSize: 13,
                             cursor: 'pointer',
                             transition: 'opacity 0.15s',
-                            opacity: saving ? 0.6 : 1,
                             border: 'none',
                             display: 'flex',
                             alignItems: 'center',
@@ -296,7 +293,7 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                             gap: 8,
                         }}
                     >
-                        {saving ? 'Saving...' : 'Save Goal'}
+                        Save Goal
                     </button>
                 </div>
             </div>
