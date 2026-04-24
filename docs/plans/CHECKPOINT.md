@@ -17,12 +17,12 @@
 | U04 | Strava Sync — WeightTraining + Retroactive | completed | `backend/routes/activities.js`, `backend/scripts/retroactive_parse.js`, `backend/db/index.js` |
 | U05 | TDEE Service + Nutrition API Routes | completed | `backend/services/tdee.js`, `backend/routes/nutrition.js`, `backend/db/index.js`, `backend/index.js` |
 | U06 | Coach Chat — Food Intent Routing | completed | `backend/routes/coach.js` |
-| U07 | ProfilePage v2 Redesign | pending | `frontend/src/ProfilePage.jsx` |
-| U08 | ChatWidget v2 Redesign | pending | `frontend/src/components/ChatWidget.jsx` |
-| U09 | Modal Token Swap | pending | `frontend/src/GoalEditorModal.jsx`, `frontend/src/components/ConfirmationModal.jsx` |
-| U10 | App.jsx — Coach Route + 5-Tab Nav + Fuel Route | pending | `frontend/src/App.jsx` |
-| U11 | NutritionPage (Fuel Screen) | pending | `frontend/src/NutritionPage.jsx` |
-| U12 | ActivityDetailPage — WeightTraining Variant | pending | `frontend/src/ActivityDetailPage.jsx`, `backend/routes/activities.js` |
+| U07 | ProfilePage v2 Redesign | in_progress | `frontend/src/ProfilePage.jsx` |
+| U08 | ChatWidget v2 Redesign | in_progress | `frontend/src/components/ChatWidget.jsx` |
+| U09 | Modal Token Swap | in_progress | `frontend/src/GoalEditorModal.jsx`, `frontend/src/components/ConfirmationModal.jsx` |
+| U10 | App.jsx — Coach Route + 5-Tab Nav + Fuel Route | in_progress | `frontend/src/App.jsx` |
+| U11 | NutritionPage (Fuel Screen) | in_progress | `frontend/src/NutritionPage.jsx` |
+| U12 | ActivityDetailPage — WeightTraining Variant | in_progress | `frontend/src/ActivityDetailPage.jsx`, `backend/routes/activities.js` |
 | U13 | Verification Pass | pending | read-only |
 
 ## Notes
