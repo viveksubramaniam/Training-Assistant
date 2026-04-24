@@ -714,8 +714,9 @@ export const saveDailyPlanCache = async (userId, date, planData, lastActivityId)
 
 export const getWeeklyPlanCache = async (userId, userWeekStart) => {
     const res = await pool.query(
-        `SELECT week_start, monday, tuesday, wednesday, thursday, friday, saturday, sunday 
-         FROM weekly_plan_cache 
+        `SELECT week_start, monday, tuesday, wednesday, thursday, friday, saturday, sunday,
+                weekly_easy_pace, weekly_tempo_pace, weekly_long_run_pace
+         FROM weekly_plan_cache
          WHERE user_id = $1 AND week_start = $2`,
         [userId, userWeekStart]
     );
@@ -760,10 +761,14 @@ export const getWeeklyPlanCache = async (userId, userWeekStart) => {
     });
 
     return {
-        weekNumber: row.monday?.weekNumber || 1, // Fallback
+        weekNumber: row.monday?.weekNumber || 1,
         weekTheme: row.monday?.weekTheme || 'Training',
         weekFocus: row.monday?.weekFocus || 'General',
-        days: processedDays
+        days: processedDays,
+        // Personalized pace targets (issue #9)
+        weeklyEasyPace:    row.weekly_easy_pace    || null,
+        weeklyTempoPace:   row.weekly_tempo_pace   || null,
+        weeklyLongRunPace: row.weekly_long_run_pace || null
     };
 };
 
@@ -787,23 +792,132 @@ export const saveWeeklyPlanCache = async (userId, userWeekStart, planData) => {
 
     await pool.query(`
         INSERT INTO weekly_plan_cache (
-            user_id, week_start, 
-            monday, tuesday, wednesday, thursday, friday, saturday, sunday
+            user_id, week_start,
+            monday, tuesday, wednesday, thursday, friday, saturday, sunday,
+            weekly_easy_pace, weekly_tempo_pace, weekly_long_run_pace
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (user_id, week_start) DO UPDATE SET 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (user_id, week_start) DO UPDATE SET
             monday = EXCLUDED.monday,
             tuesday = EXCLUDED.tuesday,
             wednesday = EXCLUDED.wednesday,
             thursday = EXCLUDED.thursday,
             friday = EXCLUDED.friday,
             saturday = EXCLUDED.saturday,
-            sunday = EXCLUDED.sunday
+            sunday = EXCLUDED.sunday,
+            weekly_easy_pace    = COALESCE(EXCLUDED.weekly_easy_pace,    weekly_plan_cache.weekly_easy_pace),
+            weekly_tempo_pace   = COALESCE(EXCLUDED.weekly_tempo_pace,   weekly_plan_cache.weekly_tempo_pace),
+            weekly_long_run_pace = COALESCE(EXCLUDED.weekly_long_run_pace, weekly_plan_cache.weekly_long_run_pace)
     `, [
         userId, userWeekStart,
         dayMap.monday || null, dayMap.tuesday || null, dayMap.wednesday || null, dayMap.thursday || null,
-        dayMap.friday || null, dayMap.saturday || null, dayMap.sunday || null
+        dayMap.friday || null, dayMap.saturday || null, dayMap.sunday || null,
+        planData.weeklyEasyPace    || null,
+        planData.weeklyTempoPace   || null,
+        planData.weeklyLongRunPace || null
     ]);
+};
+
+/**
+ * Compute personalized pace targets from the user's historical activities.
+ *
+ * Strategy (issue #9):
+ *  1. Classify each run in the last 12 weeks as easy, tempo, or long by its
+ *     distance and effort (pace relative to the user's median pace).
+ *  2. Average the paces within each bucket.
+ *  3. Apply a 2 % per-week progressive improvement so that each successive
+ *     weekly plan targets slightly faster paces.
+ *
+ * Returns:  { easyPace, tempoPace, longRunPace }  — all in "mm:ss" /km format,
+ *           or null for any bucket where there is insufficient data.
+ *
+ * @param {string} userId
+ * @param {number} weeksCompleted  Number of weeks into the training plan (for 2 %/week progression)
+ * @returns {Promise<{easyPace: string|null, tempoPace: string|null, longRunPace: string|null}>}
+ */
+export const computePersonalizedPaces = async (userId, weeksCompleted = 0) => {
+    try {
+        // Fetch recent runs with enough data to classify them
+        const result = await pool.query(`
+            SELECT
+                distance,
+                moving_time,
+                CASE WHEN average_speed > 0 THEN 1000.0 / average_speed / 60.0 ELSE NULL END AS pace_min_km
+            FROM activities
+            WHERE user_id = $1
+              AND sport_type IN ('Run', 'TrailRun', 'VirtualRun')
+              AND distance > 0
+              AND moving_time > 0
+              AND average_speed > 0
+              AND start_date > NOW() - INTERVAL '12 weeks'
+            ORDER BY start_date DESC
+        `, [userId]);
+
+        const runs = result.rows;
+        if (runs.length < 3) {
+            // Not enough data — return nulls so the LLM uses its own defaults
+            return { easyPace: null, tempoPace: null, longRunPace: null };
+        }
+
+        // Compute the user's median pace to anchor classification
+        const sortedPaces = [...runs].map(r => r.pace_min_km).sort((a, b) => a - b);
+        const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
+
+        // Classify runs
+        const easyBucket    = [];
+        const tempoBucket   = [];
+        const longRunBucket = [];
+
+        for (const run of runs) {
+            const distKm  = run.distance / 1000;
+            const pace    = run.pace_min_km;
+
+            if (distKm >= 15) {
+                // Long run: any run >= 15 km
+                longRunBucket.push(pace);
+            } else if (pace < medianPace * 0.96) {
+                // Tempo: notably faster than median
+                tempoBucket.push(pace);
+            } else {
+                // Easy: at or slower than median
+                easyBucket.push(pace);
+            }
+        }
+
+        // Average each bucket
+        const avg = arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+
+        let easyAvg    = avg(easyBucket);
+        let tempoAvg   = avg(tempoBucket);
+        let longRunAvg = avg(longRunBucket);
+
+        // Fill empty buckets with reasonable offsets from median
+        if (!easyAvg)    easyAvg    = medianPace + 0.5;    // +30s /km from median
+        if (!tempoAvg)   tempoAvg   = medianPace * 0.94;   // ~6 % faster than median
+        if (!longRunAvg) longRunAvg = medianPace + 0.25;   // +15s /km from median
+
+        // Apply 2 % per-week progressive improvement (each week paces improve by 2 %)
+        const progressionFactor = Math.pow(0.98, Math.max(0, weeksCompleted));
+        easyAvg    *= progressionFactor;
+        tempoAvg   *= progressionFactor;
+        longRunAvg *= progressionFactor;
+
+        // Format as mm:ss
+        const fmtPace = (decimalMin) => {
+            const mins = Math.floor(decimalMin);
+            const secs = Math.round((decimalMin - mins) * 60);
+            return `${mins}:${String(secs).padStart(2, '0')}`;
+        };
+
+        return {
+            easyPace:    fmtPace(easyAvg),
+            tempoPace:   fmtPace(tempoAvg),
+            longRunPace: fmtPace(longRunAvg)
+        };
+    } catch (err) {
+        console.error('[DB] computePersonalizedPaces error:', err.message);
+        return { easyPace: null, tempoPace: null, longRunPace: null };
+    }
 };
 
 export const calculateStreak = async (userId) => {
