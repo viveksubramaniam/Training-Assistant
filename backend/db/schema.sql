@@ -372,3 +372,102 @@ CREATE TRIGGER user_goals_updated_at
     BEFORE UPDATE ON user_goals
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================================
+-- STRIIVE FITNESS EXPANSION — 2026-04-24
+-- Migration: 001_fitness_expansion
+-- ============================================================================
+
+-- ============================================================================
+-- USERS TABLE — Extended Columns (body metrics + macro targets)
+-- ============================================================================
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm REAL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS weight_kg REAL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS macro_protein_pct REAL DEFAULT 0.30;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS macro_carb_pct REAL DEFAULT 0.45;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS macro_fat_pct REAL DEFAULT 0.25;
+
+-- ============================================================================
+-- WEIGHT TRAINING SETS TABLE
+-- Individual sets parsed from Strava WeightTraining activity descriptions
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS weight_training_sets (
+    id              BIGSERIAL PRIMARY KEY,
+    activity_id     BIGINT NOT NULL REFERENCES activities(strava_activity_id) ON DELETE CASCADE,
+    user_id         BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
+    exercise_name   TEXT NOT NULL,
+    set_number      INTEGER NOT NULL,
+    reps            INTEGER,
+    weight_kg       REAL,
+    muscle_groups   TEXT[],
+    description_hash TEXT,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT valid_set_number CHECK (set_number > 0),
+    CONSTRAINT valid_reps       CHECK (reps IS NULL OR reps > 0),
+    CONSTRAINT valid_weight     CHECK (weight_kg IS NULL OR weight_kg > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wts_activity     ON weight_training_sets(activity_id);
+CREATE INDEX IF NOT EXISTS idx_wts_user_created ON weight_training_sets(user_id, created_at DESC);
+
+-- ============================================================================
+-- FOOD LOGS TABLE
+-- One row per food item/meal logged per user
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS food_logs (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
+    logged_at    TIMESTAMPTZ DEFAULT NOW(),
+    description  TEXT,
+    meal_slot    TEXT,
+    kcal         INTEGER,
+    protein_g    INTEGER,
+    carbs_g      INTEGER,
+    fat_g        INTEGER,
+    fibre_g      INTEGER,
+    source       TEXT CHECK (source IN ('chat', 'manual')),
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_food_logs_user_logged ON food_logs(user_id, logged_at DESC);
+
+-- ============================================================================
+-- NUTRITION GOALS TABLE
+-- One row per (user, date) — daily macro/calorie targets
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS nutrition_goals (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
+    date            DATE NOT NULL,
+    kcal_goal       INTEGER,
+    protein_g_goal  INTEGER,
+    carbs_g_goal    INTEGER,
+    fat_g_goal      INTEGER,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nutrition_goals_user_date ON nutrition_goals(user_id, date DESC);
+
+-- ============================================================================
+-- NUTRITION CONVERSATIONS TABLE
+-- Chat history for the nutrition/fuel AI coach
+-- Mirrors coach_conversations pattern
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS nutrition_conversations (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users(strava_id) ON DELETE CASCADE,
+    role       TEXT NOT NULL,
+    content    TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_nutrition_conv_user ON nutrition_conversations(user_id, created_at DESC);
