@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite build --mode development)"
+    ]
+  },
+  "env": {
+    "SUPABASE_ACCESS_TOKEN": "sbp_7afd107e9f3b7436b578f23bed1852360db9978b"
+  }
+}
