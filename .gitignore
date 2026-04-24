@@ -40,8 +40,10 @@ yarn-error.log*
 # Python Venv
 server/ai_service/venv
 
-
-./claude.md
-./.claude/settings.json
-./.env.render
-./TEST_AGENT_RUNBOOK.md
+# Local-only files (development, plans, secrets)
+.env.render
+.claude/settings.json
+claude.md
+TEST_AGENT_RUNBOOK.md
+docs/superpowers/
+implementation-plan.md
