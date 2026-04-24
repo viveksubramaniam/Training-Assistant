@@ -32,7 +32,7 @@ const BrainSVG = ({ size = 14, color = 'white' }) => (
     </svg>
 );
 
-const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
+const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
     const [messages, setMessages] = useState([
         { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!" }
     ]);
@@ -47,9 +47,9 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Load chat history from DB on first open
+    // Load chat history from DB on component mount
     useEffect(() => {
-        if (isOpen && !historyLoaded) {
+        if (!historyLoaded) {
             const loadHistory = async () => {
                 try {
                     const token = localStorage.getItem('authToken');
@@ -70,13 +70,11 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
             };
             loadHistory();
         }
-    }, [isOpen, historyLoaded]);
+    }, [historyLoaded]);
 
     useEffect(() => {
-        if (isOpen) {
-            setTimeout(scrollToBottom, 300);
-        }
-    }, [messages, isOpen]);
+        setTimeout(scrollToBottom, 300);
+    }, [messages]);
 
     const sendMessage = async (messageText) => {
         const userMessage = (messageText || input).trim();
@@ -139,6 +137,11 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         sendMessage(suggestion.message);
     };
 
+    const handleBack = () => {
+        // Navigate back to home using hash routing
+        window.location.hash = '#/home';
+    };
+
     const renderActionBadge = (msg) => {
         if (!msg.action || msg.action === 'chat') {
             if (msg.planUpdate) {
@@ -178,16 +181,13 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         );
     };
 
-    if (!isOpen) return null;
-
     return (
         <div style={{
-            position: 'fixed',
-            inset: 0,
             background: 'var(--color-bg)',
-            zIndex: 50,
             display: 'flex',
             flexDirection: 'column',
+            height: '100vh',
+            width: '100%',
         }}>
             {/* Header */}
             <div style={{
@@ -202,7 +202,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
             }}>
                 {/* Back button */}
                 <button
-                    onClick={onClose}
+                    onClick={handleBack}
                     style={{
                         width: 36,
                         height: 36,
@@ -215,6 +215,13 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                         cursor: 'pointer',
                         color: 'var(--color-fg)',
                         flexShrink: 0,
+                        transition: 'background 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.background = 'var(--color-line)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.background = 'var(--color-surface-2)';
                     }}
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
