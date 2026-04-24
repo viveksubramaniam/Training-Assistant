@@ -5,7 +5,6 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
     const [targetDate, setTargetDate] = useState('');
     const [weeklyTarget, setWeeklyTarget] = useState(40);
     const [preferredDays, setPreferredDays] = useState(['Mon', 'Wed', 'Fri', 'Sun']);
-    const [saving, setSaving] = useState(false);
     const [inputFocused, setInputFocused] = useState(null);
 
     const goalTypes = ['5K', '10K', 'Half Marathon', 'Marathon', 'General Fitness'];
@@ -134,7 +133,7 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                                         fontWeight: 600,
                                         transition: 'all 0.15s',
                                         background: goalType === type ? 'var(--color-ignite)' : 'var(--color-surface-2)',
-                                        color: goalType === type ? 'white' : 'var(--color-fg-muted)',
+                                        color: goalType === type ? 'var(--color-fg)' : 'var(--color-fg-muted)',
                                         border: goalType === type ? 'none' : '1px solid var(--color-line)',
                                         cursor: 'pointer',
                                     }}
@@ -242,7 +241,7 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                                         textTransform: 'uppercase',
                                         transition: 'all 0.15s',
                                         background: preferredDays.includes(day) ? 'var(--color-ignite)' : 'var(--color-surface-2)',
-                                        color: preferredDays.includes(day) ? 'white' : 'var(--color-fg-muted)',
+                                        color: preferredDays.includes(day) ? 'var(--color-fg)' : 'var(--color-fg-muted)',
                                         border: preferredDays.includes(day) ? 'none' : '1px solid var(--color-line)',
                                         cursor: 'pointer',
                                     }}
@@ -277,18 +276,16 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={saving}
                         style={{
                             flex: 1,
                             padding: '12px 16px',
                             borderRadius: 12,
                             background: 'var(--color-ignite)',
-                            color: 'white',
+                            color: 'var(--color-fg)',
                             fontWeight: 700,
                             fontSize: 13,
                             cursor: 'pointer',
                             transition: 'opacity 0.15s',
-                            opacity: saving ? 0.6 : 1,
                             border: 'none',
                             display: 'flex',
                             alignItems: 'center',
@@ -296,7 +293,7 @@ export default function GoalEditorModal({ isOpen, onClose, existingGoal, onSave 
                             gap: 8,
                         }}
                     >
-                        {saving ? 'Saving...' : 'Save Goal'}
+                        Save Goal
                     </button>
                 </div>
             </div>

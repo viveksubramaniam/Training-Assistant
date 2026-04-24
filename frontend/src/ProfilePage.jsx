@@ -233,7 +233,7 @@ const ProfilePage = ({ user, activities }) => {
                     >
                         <span
                             className="font-display font-bold text-xl"
-                            style={{ color: '#fff' }}
+                            style={{ color: 'var(--color-fg)' }}
                         >
                             {user?.name?.[0] || 'A'}
                         </span>

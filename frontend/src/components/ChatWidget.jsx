@@ -25,16 +25,16 @@ const QUICK_SUGGESTIONS = [
 ];
 
 // Brain SVG used in avatars
-const BrainSVG = ({ size = 14, color = 'white' }) => (
+const BrainSVG = ({ size = 14, color = 'var(--color-fg)' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
         <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
         <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
     </svg>
 );
 
-const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
+const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!" }
+        { role: 'assistant', content: "Hi! I'm your AI coach. I can help you manage your goals, adjust workouts, or answer any training questions. Try asking me to skip a workout, change difficulty, or set a new goal!", timestamp: Date.now() }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -47,9 +47,9 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Load chat history from DB on first open
+    // Load chat history from DB on component mount
     useEffect(() => {
-        if (isOpen && !historyLoaded) {
+        if (!historyLoaded) {
             const loadHistory = async () => {
                 try {
                     const token = localStorage.getItem('authToken');
@@ -70,13 +70,11 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
             };
             loadHistory();
         }
-    }, [isOpen, historyLoaded]);
+    }, [historyLoaded]);
 
     useEffect(() => {
-        if (isOpen) {
-            setTimeout(scrollToBottom, 300);
-        }
-    }, [messages, isOpen]);
+        setTimeout(scrollToBottom, 300);
+    }, [messages]);
 
     const sendMessage = async (messageText) => {
         const userMessage = (messageText || input).trim();
@@ -84,7 +82,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
 
         setInput('');
         setShowSuggestions(false);
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setMessages(prev => [...prev, { role: 'user', content: userMessage, timestamp: Date.now() }]);
         setIsLoading(true);
 
         try {
@@ -98,14 +96,22 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                 body: JSON.stringify({ message: userMessage })
             });
 
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
             const data = await response.json();
+            if (!data.message) {
+                throw new Error('Invalid response format from API');
+            }
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: data.message,
                 action: data.action,
                 planUpdate: data.planUpdate,
-                goalChanged: data.goalChanged
+                goalChanged: data.goalChanged,
+                timestamp: Date.now()
             }]);
 
             // Notify parent about plan updates
@@ -121,7 +127,8 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         } catch (error) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: "I'm having trouble connecting. Let's try again."
+                content: "I'm having trouble connecting. Let's try again.",
+                timestamp: Date.now()
             }]);
         } finally {
             setIsLoading(false);
@@ -137,6 +144,11 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
 
     const handleSuggestionClick = (suggestion) => {
         sendMessage(suggestion.message);
+    };
+
+    const handleBack = () => {
+        // Navigate back to home using hash routing
+        window.location.hash = '#/home';
     };
 
     const renderActionBadge = (msg) => {
@@ -178,16 +190,13 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
         );
     };
 
-    if (!isOpen) return null;
-
     return (
         <div style={{
-            position: 'fixed',
-            inset: 0,
             background: 'var(--color-bg)',
-            zIndex: 50,
             display: 'flex',
             flexDirection: 'column',
+            height: '100vh',
+            width: '100%',
         }}>
             {/* Header */}
             <div style={{
@@ -202,11 +211,11 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
             }}>
                 {/* Back button */}
                 <button
-                    onClick={onClose}
+                    onClick={handleBack}
                     style={{
                         width: 36,
                         height: 36,
-                        borderRadius: '50%',
+                        borderRadius: 8,
                         background: 'var(--color-surface-2)',
                         border: '1px solid var(--color-line)',
                         display: 'flex',
@@ -215,6 +224,13 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                         cursor: 'pointer',
                         color: 'var(--color-fg)',
                         flexShrink: 0,
+                        transition: 'background 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.background = 'var(--color-line)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.background = 'var(--color-surface-2)';
                     }}
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -256,9 +272,9 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                 flexDirection: 'column',
                 gap: 16,
             }}>
-                {messages.map((msg, idx) => (
+                {messages.map((msg) => (
                     <div
-                        key={idx}
+                        key={`${msg.role}-${msg.timestamp}-${msg.content.substring(0, 10)}`}
                         style={{
                             display: 'flex',
                             justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
@@ -289,7 +305,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                             ...(msg.role === 'user'
                                 ? {
                                     background: 'var(--color-ignite)',
-                                    color: 'white',
+                                    color: 'var(--color-fg)',
                                     borderRadius: '18px 18px 4px 18px',
                                     fontWeight: 500,
                                 }
@@ -358,9 +374,9 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
             {showSuggestions && messages.length <= 2 && (
                 <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
                     <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                        {QUICK_SUGGESTIONS.map((suggestion, idx) => (
+                        {QUICK_SUGGESTIONS.map((suggestion) => (
                             <button
-                                key={idx}
+                                key={`suggestion-${suggestion.label}`}
                                 onClick={() => handleSuggestionClick(suggestion)}
                                 disabled={isLoading}
                                 style={{
@@ -432,7 +448,7 @@ const ChatWidget = ({ isOpen, onClose, onPlanUpdate, onGoalChanged }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                            color: input.trim() ? 'white' : 'var(--color-fg-dim)',
+                            color: input.trim() ? 'var(--color-fg)' : 'var(--color-fg-dim)',
                             transition: 'background 0.15s, color 0.15s',
                             flexShrink: 0,
                             opacity: isLoading ? 0.5 : 1,

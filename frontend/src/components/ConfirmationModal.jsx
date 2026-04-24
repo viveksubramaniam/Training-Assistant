@@ -125,7 +125,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirm
                                 padding: '12px 16px',
                                 borderRadius: 12,
                                 fontWeight: 700,
-                                color: 'white',
+                                color: 'var(--color-fg)',
                                 border: 'none',
                                 cursor: 'pointer',
                                 transition: 'background 0.15s',
