@@ -1,0 +1,10 @@
+/home/vivek/project/ai_workout_planner/run-coach-app/README.md
+/home/vivek/project/ai_workout_planner/run-coach-app/TEST_AGENT_RUNBOOK.md
+/home/vivek/project/ai_workout_planner/run-coach-app/claude.md
+/home/vivek/project/ai_workout_planner/run-coach-app/striive_v2_plan.md
+/home/vivek/project/ai_workout_planner/run-coach-app/python-server/requirements.txt
+/home/vivek/project/ai_workout_planner/run-coach-app/frontend/index.html
+/home/vivek/project/ai_workout_planner/run-coach-app/frontend/src/calendar_plans.html
+/home/vivek/project/ai_workout_planner/run-coach-app/frontend/public/vite.svg
+/home/vivek/project/ai_workout_planner/run-coach-app/frontend/public/striive.svg
+/home/vivek/project/ai_workout_planner/run-coach-app/frontend/src/assets/react.svg
