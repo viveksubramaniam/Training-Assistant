@@ -25,7 +25,7 @@ const QUICK_SUGGESTIONS = [
 ];
 
 // Brain SVG used in avatars
-const BrainSVG = ({ size = 14, color = 'white' }) => (
+const BrainSVG = ({ size = 14, color = 'var(--color-fg)' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
         <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
         <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
@@ -206,7 +206,7 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
                     style={{
                         width: 36,
                         height: 36,
-                        borderRadius: '50%',
+                        borderRadius: 8,
                         background: 'var(--color-surface-2)',
                         border: '1px solid var(--color-line)',
                         display: 'flex',
@@ -296,7 +296,7 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
                             ...(msg.role === 'user'
                                 ? {
                                     background: 'var(--color-ignite)',
-                                    color: 'white',
+                                    color: 'var(--color-fg)',
                                     borderRadius: '18px 18px 4px 18px',
                                     fontWeight: 500,
                                 }
@@ -439,7 +439,7 @@ const ChatWidget = ({ onPlanUpdate, onGoalChanged }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                            color: input.trim() ? 'white' : 'var(--color-fg-dim)',
+                            color: input.trim() ? 'var(--color-fg)' : 'var(--color-fg-dim)',
                             transition: 'background 0.15s, color 0.15s',
                             flexShrink: 0,
                             opacity: isLoading ? 0.5 : 1,
